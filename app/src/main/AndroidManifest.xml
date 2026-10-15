@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      包可见性（见 docs/android-verification.md）：不申请 QUERY_ALL_PACKAGES，
+      以 MAIN/LAUNCHER 意图声明覆盖"有桌面图标的应用"——映射需求的全部范围。
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <!-- FR-01：枚举 HOME 启动器（resolveActivity / queryIntentActivities 需此可见性，
+             Android 11+ 不声明则当前系统启动器解析为 null，误判"不支持"） -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
+        <!-- FR-01：未知启动器的兜底探测（声明了标准图标包动作的启动器；
+             org.adw.launcher.THEMES 是 ADW 系通行标准，产物模板清单也按它声明） -->
+        <intent>
+            <action android:name="org.adw.launcher.THEMES" />
+        </intent>
+        <!-- Google 开发者验证系统服务：用于判定本机是否受验证约束（见 docs/android-verification.md）。
+             Android 11+ 包可见性限制下，不声明则 getPackageInfo 恒抛
+             NameNotFoundException，检测会永远返回 false。 -->
+        <package android:name="com.google.android.verifier" />
+    </queries>
+
+    <!-- 安装未知应用（FR-07：产物经系统安装器安装） -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <application
+        android:name=".IconPackerApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.IconPacker">
+
+        <!-- 产物 APK 的跨应用分享通道（私有目录 files/outputs/） -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.IconPacker">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

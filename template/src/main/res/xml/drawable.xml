@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  占位图标清单：模板内为空 <resources/>。
+  启动器的"手动选图标"选择器通过 res/xml/drawable.xml 枚举可选图标；
+  打包引擎构建时写入用户实际映射的图标名列表（AxmlWriter 生成）。
+-->
+<resources />

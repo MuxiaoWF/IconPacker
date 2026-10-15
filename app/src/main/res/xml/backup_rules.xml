@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  旧版（API < 31）全量备份规则。
+  full-backup-content 默认备份应用全部文件，这里只排除可再生的部分：
+  - files/template：首次打包从 assets 重建
+  - files/outputs：已打包 APK 体积大且可重新打包
+  数据库（draft 核心）与图标文件（icons）按默认全量备份。
+-->
+<full-backup-content>
+    <exclude domain="file" path="template/" />
+    <exclude domain="file" path="outputs/" />
+</full-backup-content>

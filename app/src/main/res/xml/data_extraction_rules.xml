@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  数据提取规则（Android 12+ Auto Backup）。
+  此前为空模板 → 空 cloud-backup 段在 API 31+ 下等于"什么都不备份"，
+  导致重装后 Room 数据库与图标文件全部丢失。
+
+  这里显式声明要备份的内容：
+  - databases：图标包项目 / 映射 / 图标池（草稿的核心）
+  - files/icons：图标原图与编辑产物（editedPath）
+  - sharedpref：模板刷新用的版本记录等偏好
+  并排除可再生的 artifacts：
+  - files/template：首次打包从 assets 重建
+  - files/outputs：已打包 APK 体积大且可重新打包
+
+  说明：Auto Backup 的【恢复】发生在"从备份还原安装"（如换机、恢复出厂后重装、
+  Play 商店重装）时；普通侧载覆盖安装（adb install -r）因签名一致本就保留数据目录，
+  无需依赖备份。详见 PRD 附录。
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="database" path="." />
+        <include domain="file" path="." />
+        <include domain="sharedpref" path="." />
+        <exclude domain="file" path="template/" />
+        <exclude domain="file" path="outputs/" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="database" path="." />
+        <include domain="file" path="." />
+        <include domain="sharedpref" path="." />
+        <exclude domain="file" path="template/" />
+        <exclude domain="file" path="outputs/" />
+    </device-transfer>
+</data-extraction-rules>

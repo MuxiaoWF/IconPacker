@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  模板 APK 清单（由 aapt2 编译，打包引擎用 AxmlPatcher 定点替换 label / versionCode）。
+
+  约束（AxmlPatcher 前置条件，改动前务必阅读 core/packer/axml/AxmlPatcher.kt）：
+  - android:label 必须是原始字符串，不能是 @string/xxx 引用；
+  - versionCode 在 defaultConfig 中为整数字面量；
+  - ⚠️ <activity android:name> 必须是**全限定类名**，不能写成 `.MainActivity`：
+    打包引擎只改写清单的 package 属性（多包共存的前提），相对名会被系统按改写后的
+    包名展开成 com.muxiao.icon.pN.MainActivity，而 dex 里只有 com.muxiao.icon.MainActivity
+    —— 结果是图标包能安装、能被启动器识别，唯独点开就 ClassNotFoundException。
+    该约束由 core/packer 的 RealTemplateTest「activity name survives package rename」守住。
+  - ⚠️ 抽屉入口 filter（MAIN+LAUNCHER）必须是**文档中第一个含 <category> 的 filter**：
+    setDrawerEntryVisible 替换的是字符串池里"第一个 <category>"槽位的内容（池会去重），
+    顺序错了识别 filter 的 category 会被连带改坏。识别 filter 里的
+    android.intent.category.DEFAULT 与抽屉开关不冲突——LAUNCHER 与 DEFAULT 是池中
+    两个不同槽位，切换只改写抽屉那一个槽位的内容。错序由 AxmlPatcher 的防错校验兜底
+    （打包降级保持原样），并由 RealTemplateTest「package visibility」用例守住。
+  - <queries> 只写 <action>、**不写 <category>**：queries 的 intent 若引用
+    LAUNCHER/DEFAULT 字符串，同样会被抽屉开关连带改写，声明随之失效（实测踩过）。
+
+  识别 filter 集合（尽可能多桌面适配，依据真实启动器源码 + 业界事实标准图标包
+  Arcticons/CandyBar 系的 manifest 逐条核对）：
+
+  启动器发现图标包的方式是 PackageManager 查询——把下列字符串当 **action**
+  （如 Kvaesitso AppFilterIconPackInstaller 源码：queryIntentActivities(Intent("org.adw.launcher.THEMES"), 0)），
+  或当 **category** 配 MAIN 查询（Apex：new Intent(MAIN).addCategory("com.anddoes.launcher.THEME")）。
+  因此每个字符串必须以启动器实际使用的方式声明（action / category 不可互换）。
+  旧模板的教训：全用自定义 action 声明识别入口，且核心字符串写错
+  （org.adw.ActivityStarter.THEMES 只有 Kvaesitso 认，ADW 标准是 org.adw.launcher.THEMES），
+  导致除 Kvaesitso 外所有桌面都检测不到图标包。
+
+  | 字符串                                     | 声明方式               | 覆盖桌面 |
+  |============================================|========================|==========|
+  | org.adw.launcher.THEMES                    | action + DEFAULT       | ADW 系通行标准：Nova / Apex / KISS / Lawnchair / Neo / Niagara 等的事实扫描入口 |
+  | org.adw.ActivityStarter.THEMES             | action + DEFAULT       | Kvaesitso（其源码额外扫描的兼容动作） |
+  | com.novalauncher.THEME                     | action + category CUSTOM_ICON_PICKER | Nova 一键应用 / 自定义图标选择器（也是 Kvaesitso 扫描 action 之一） |
+  | com.anddoes.launcher.THEME                 | **category**（配 MAIN） | Apex（写成 action 匹配不到，旧模板踩过） |
+  | com.gau.go.launcherex.theme                | action + MAIN + DEFAULT | GO 桌面 |
+  | org.adwfreak.launcher.THEMES               | action + DEFAULT       | ADW.Ex |
+  | com.fede.launcher.THEME_ICONPACK           | action + DEFAULT       | LauncherPro 系（旧模板误写 com.fede.launcher.THEME，无启动器扫描该串） |
+  | com.dlto.atom.launcher.THEME               | action + DEFAULT       | Atom |
+  | ginlemon.smartlauncher.THEMES              | action + DEFAULT       | Smart Launcher |
+  | com.sonymobile.home.ICON_PACK              | action + DEFAULT       | Sony Home |
+  | com.lge.launcher2.THEME                    | action + MAIN + DEFAULT | LG Home |
+  | com.motorola.launcher.ACTION_ICON_PACK     | action + DEFAULT       | Moto 桌面 |
+  | ch.deletescape.lawnchair.ICONPACK          | action + category PICK_ICON | Lawnchair 1.x |
+  | home.solo.launcher.free.THEMES             | action + MAIN          | Solo |
+  | com.tsf.shell.themes                       | action + DEFAULT       | TSF Shell |
+  | com.vivid.launcher.theme                   | action + MAIN + DEFAULT | V Launcher |
+  | com.zeroteam.zerolauncher.theme            | action + MAIN + DEFAULT | Zero Launcher |
+  | com.gridappsinc.launcher.theme.apk_action  | action + DEFAULT       | Nine Launcher |
+  | *ACTION_PICK_ICON 系列                     | action + DEFAULT       | 各启动器"手动替换单个图标"的选择器入口（ADW / OnePlus / Turbo / +HOME / Projectivy） |
+
+  刻意**不声明** app.lawnchair.icons.THEMED_ICON（Lawnchair 3 / Kvaesitso 的灰度主题
+  图标专用动作）：彩色位图包误声明会被当 themed icon pack 处理，反而装不上图标。
+  已删除旧模板的 com.teslacoilsw.launcher.THEME（无任何现代启动器以它扫描）。
+  回归用例：RealTemplateTest「template declares launcher discovery filters」。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:label="My Icon Pack"
+        android:icon="@mipmap/ic_launcher"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+
+        <activity
+            android:name="com.muxiao.icon.MainActivity"
+            android:exported="true">
+
+            <!--
+              抽屉入口：决定图标包是否出现在应用抽屉里。
+              必须是文档中第一个含 <category> 的 filter（见文件头约束）。
+              action 固定为 MAIN；category 由打包引擎在
+              LAUNCHER（显示）/ DEFAULT（隐藏）之间切换，见
+              AxmlPatcher.setDrawerEntryVisible。
+              DEFAULT 是刻意选的"无效果"组合——Launcher3 只按 MAIN+LAUNCHER
+              查询抽屉项，MAIN+DEFAULT 不会被任何桌面拾取。
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- ADW 系通行标准（Nova/Apex/KISS/Lawnchair/Neo 等的事实扫描入口） -->
+            <intent-filter>
+                <action android:name="org.adw.launcher.THEMES" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- Apex：category 型（启动器用 MAIN + 该 category 查询） -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="com.anddoes.launcher.THEME" />
+            </intent-filter>
+
+            <!-- GO 桌面 -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <action android:name="com.gau.go.launcherex.theme" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- Nova：一键应用 / 自定义图标选择器（Kvaesitso 亦按此 action 扫描） -->
+            <intent-filter>
+                <action android:name="com.novalauncher.THEME" />
+                <category android:name="com.novalauncher.category.CUSTOM_ICON_PICKER" />
+            </intent-filter>
+
+            <!-- Kvaesitso 兼容动作（其源码额外扫描的 action） -->
+            <intent-filter>
+                <action android:name="org.adw.ActivityStarter.THEMES" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- ADW.Ex -->
+            <intent-filter>
+                <action android:name="org.adwfreak.launcher.THEMES" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- LauncherPro 系 -->
+            <intent-filter>
+                <action android:name="com.fede.launcher.THEME_ICONPACK" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- Atom Launcher -->
+            <intent-filter>
+                <action android:name="com.dlto.atom.launcher.THEME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- Smart Launcher -->
+            <intent-filter>
+                <action android:name="ginlemon.smartlauncher.THEMES" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- Sony Home -->
+            <intent-filter>
+                <action android:name="com.sonymobile.home.ICON_PACK" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- LG Home -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <action android:name="com.lge.launcher2.THEME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- Moto 桌面 -->
+            <intent-filter>
+                <action android:name="com.motorola.launcher.ACTION_ICON_PACK" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- Lawnchair 1.x -->
+            <intent-filter>
+                <action android:name="ch.deletescape.lawnchair.ICONPACK" />
+                <category android:name="ch.deletescape.lawnchair.PICK_ICON" />
+            </intent-filter>
+
+            <!-- Solo Launcher -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <action android:name="home.solo.launcher.free.THEMES" />
+            </intent-filter>
+
+            <!-- TSF Shell -->
+            <intent-filter>
+                <action android:name="com.tsf.shell.themes" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- V Launcher -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <action android:name="com.vivid.launcher.theme" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- Zero Launcher -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <action android:name="com.zeroteam.zerolauncher.theme" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- Nine Launcher -->
+            <intent-filter>
+                <action android:name="com.gridappsinc.launcher.theme.apk_action" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- ADW 自定义图标选择器（手动替换单个图标） -->
+            <intent-filter>
+                <action android:name="org.adw.launcher.icons.ACTION_PICK_ICON" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- OnePlus 桌面图标选择器 -->
+            <intent-filter>
+                <action android:name="net.oneplus.launcher.icons.ACTION_PICK_ICON" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- Turbo Launcher 图标选择器 -->
+            <intent-filter>
+                <action android:name="com.phonemetra.turbo.launcher.icons.ACTION_PICK_ICON" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- +HOME 图标选择器 -->
+            <intent-filter>
+                <action android:name="jp.co.a_tm.android.launcher.icons.ACTION_PICK_ICON" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- Projectivy Launcher（TV）图标选择器 -->
+            <intent-filter>
+                <action android:name="com.spocky.projengmenu.icons.ACTION_PICK_ICON" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+    </application>
+
+    <!--
+      包可见性声明（Android 11+ 必需）：界面要在列表里显示"这个图标是给哪个应用用的"，
+      就要查目标应用的名字。而 targetSdk ≥ 30 的应用默认**看不到**其他应用——
+      PackageManager.getApplicationInfo() 会抛 NameNotFoundException，
+      已安装的应用也会被显示成"未安装"（真机实测踩到过）。
+      这里只申请"能看到带 MAIN 入口的应用"，正是图标包要换图标的那一批，
+      不必也不该动 QUERY_ALL_PACKAGES。
+
+      ⚠️ 只写 <action>、**不写 <category>**：AxmlPatcher.setDrawerEntryVisible 是按
+      "清单里第一个 <category>" 的约定工作的（它替换的是字符串池里那条字符串，
+      池会去重，引用同一条字符串的其他位置会被一起改掉）——实测在 queries 里带
+      category 时，隐藏抽屉入口会把这里一并改坏，声明随之失效。
+      该约束由 core/packer 的 RealTemplateTest「package visibility」用例守住。
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+        </intent>
+    </queries>
+</manifest>

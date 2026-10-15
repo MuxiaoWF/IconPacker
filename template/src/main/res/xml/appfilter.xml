@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  占位映射表：模板内为空 <resources/>。
+  打包引擎在构建时把生成的 appfilter 内容写入产物 APK 的 res/xml/appfilter.xml
+  （整条目二进制 XML 由 core/packer 的 AxmlWriter 生成，本文件仅占位以让
+  aapt2 在 arsc 中登记该资源名）。
+-->
+<resources />

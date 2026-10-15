@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Compose 宿主主题：仅提供无 ActionBar 的 DayNight 外壳，
+      全部视觉由 ui/theme/Theme.kt（Material 3 + 动态取色）承载。
+
+      注意：勿加 android:windowLayoutFlags——那是非公开框架属性，
+      资源链接会直接报 "attr not found" 失败。边缘到边缘布局由
+      MainActivity 的 enableEdgeToEdge() 负责。
+
+      parent 用 framework 内置主题而非 Theme.Material3.*（后者来自
+      com.google.android.material，已随体积优化移除）：本应用视觉 100% 由
+      Compose MaterialTheme 绘制，XML 主题只负责窗口外壳与状态栏，无差异。
+    -->
+    <style name="Theme.IconPacker" parent="@android:style/Theme.DeviceDefault.DayNight">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+</resources>

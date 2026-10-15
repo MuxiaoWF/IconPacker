@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  图标包应用自带界面的文案（见 com.muxiao.icon.MainActivity）。
+
+  注意：图标包**应用名**不在这里——它是清单里的 android:label 原始字符串，
+  由打包引擎用 AxmlPatcher 定点替换（见 core/packer/axml/AxmlPatcher.kt 的前置约束）。
+-->
+<resources>
+    <string name="ic_pack_label_prefix">包名</string>
+    <string name="ic_pack_stats">%1$d 个图标 · %2$d 个应用已映射</string>
+    <string name="ic_pack_how_to_enable">启用图标包：启动器设置 → 图标样式 / 主题 → 选择本图标包</string>
+    <string name="ic_pack_unmapped">未映射</string>
+    <string name="ic_pack_not_installed">未安装</string>
+    <string name="ic_pack_empty_title">这个图标包还没有内容</string>
+    <string name="ic_pack_empty_hint">请回到 IconPacker 导入图标并完成映射后重新打包。</string>
+    <string name="ic_pack_copied">已复制 %1$s</string>
+</resources>
