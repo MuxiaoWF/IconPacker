@@ -32,6 +32,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -221,6 +222,24 @@ fun MappingScreen(
                             Text("添加映射")
                         }
                     }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        FilterChip(
+                            selected = state.onlyUnmapped,
+                            onClick = { viewModel.setOnlyUnmapped(!state.onlyUnmapped) },
+                            label = { Text("只看未映射") },
+                        )
+                        if (state.onlyUnmapped && state.visibleApps.isEmpty()) {
+                            Text(
+                                text = "已安装应用全部映射完毕；给未安装的应用指图标可点「添加映射」",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.align(Alignment.CenterVertically),
+                            )
+                        }
+                    }
                     if (state.loading) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator()
@@ -259,11 +278,28 @@ fun MappingScreen(
                             enabled = state.icons.isNotEmpty() && !state.importing,
                         ) { Text("统一形状") }
                     }
-                    IconLibraryTab(
-                        icons = state.icons,
-                        iconTargets = state.iconTargets,
-                        onIconClick = { detailIcon = it },
-                    )
+                    if (state.icons.isEmpty() && !state.importing) {
+                        // 空状态引导：新项目最容易在"导入"这一步停顿——把两条导入通道
+                        // 的入口明示在库面板里（顶部 chips 本就有，这里只是再指一次路）
+                        Box(
+                            modifier = Modifier.fillMaxSize().padding(32.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = "还没有图标。\n用上方「相册导入」逐张导入，\n" +
+                                    "或「ZIP 导入」整包导入图标包（自动建映射）。",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.align(Alignment.Center),
+                            )
+                        }
+                    } else {
+                        IconLibraryTab(
+                            icons = state.icons,
+                            iconTargets = state.iconTargets,
+                            onIconClick = { detailIcon = it },
+                        )
+                    }
                 }
             }
         }

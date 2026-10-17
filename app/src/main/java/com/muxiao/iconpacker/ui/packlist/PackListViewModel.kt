@@ -319,7 +319,7 @@ class PackListViewModel(
             val result = runCatching { ServiceLocator.projectBackup.exportProject(pack.id, uri) }
             backupBusyFlow.value = null
             messageFlow.value = result.fold(
-                onSuccess = { "已导出项目备份（${it / 1024} KB），含图标与映射，不含密钥库" },
+                onSuccess = { "已导出项目备份（${it / 1024} KB）" },
                 onFailure = { "备份导出失败：${it.message}" },
             )
         }
@@ -333,7 +333,8 @@ class PackListViewModel(
             importingBackupFlow.value = false
             result.fold(
                 onSuccess = { packId ->
-                    messageFlow.value = "项目已导入"
+                    messageFlow.value = "项目已导入；备份不含密钥库，打包将用本机新密钥签名" +
+                        "（换设备后无法覆盖旧安装，需先卸载旧产物）"
                     createdPackIdFlow.value = packId
                 },
                 onFailure = { messageFlow.value = "备份导入失败：${it.message}" },

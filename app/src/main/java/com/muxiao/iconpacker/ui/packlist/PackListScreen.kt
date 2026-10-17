@@ -428,7 +428,7 @@ private fun PackItem(
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("导出项目备份（ZIP）") },
+                        text = { Text("导出项目备份（ZIP，不含密钥库）") },
                         onClick = {
                             menuExpanded = false
                             onExportBackup()

@@ -53,15 +53,23 @@ data class MappingUiState(
      *  "这张图有没有被用上"，把预置映射排除掉会让那批图标显示成"未使用"。 */
     val iconTargets: Map<Int, List<AppRow>> = emptyMap(),
     val query: String = "",
+    /** 只看未映射的应用（应用多时逐行找未映射项太费劲） */
+    val onlyUnmapped: Boolean = false,
     val loading: Boolean = true,
     val importing: Boolean = false,
     val message: String? = null,
 ) {
     val mappedCount: Int get() = apps.count { it.assignedSlot != null }
     val visibleApps: List<AppRow>
-        get() = if (query.isBlank()) apps else apps.filter {
-            it.label.contains(query, ignoreCase = true) || it.packageName.contains(query, ignoreCase = true)
-        }
+        get() = apps
+            .asSequence()
+            .filter { if (onlyUnmapped) it.assignedSlot == null else true }
+            .filter { app ->
+                query.isBlank() ||
+                    app.label.contains(query, ignoreCase = true) ||
+                    app.packageName.contains(query, ignoreCase = true)
+            }
+            .toList()
 }
 
 class MappingViewModel(
@@ -73,14 +81,32 @@ class MappingViewModel(
     private val queryFlow = MutableStateFlow("")
     private val messageFlow = MutableStateFlow<String?>(null)
     private val importingFlow = MutableStateFlow(false)
+    private val unmappedOnlyFlow = MutableStateFlow(false)
+
+    /** 搜索行下方控件共用的小状态包 */
+    private data class ListControls(
+        val query: String,
+        val message: String?,
+        val importing: Boolean,
+        val onlyUnmapped: Boolean,
+    )
+
+    private val listControlsFlow = combine(
+        queryFlow,
+        messageFlow,
+        importingFlow,
+        unmappedOnlyFlow,
+    ) { query, message, importing, onlyUnmapped ->
+        ListControls(query, message, importing, onlyUnmapped)
+    }
 
     val uiState: StateFlow<MappingUiState> = combine(
         repository.observePack(packId),
         repository.observeMappings(packId),
         repository.observeIcons(packId),
         appsFlow,
-        combine(queryFlow, messageFlow, importingFlow) { q, m, i -> Triple(q, m, i) },
-    ) { pack, mappings, icons, apps, (query, message, importing) ->
+        listControlsFlow,
+    ) { pack, mappings, icons, apps, controls ->
         val slotByComponent = mappings.associate { it.component to it.slot }
 
         // 列表只由"本机已安装的可启动应用"构成：
@@ -123,10 +149,11 @@ class MappingViewModel(
             apps = appRows,
             icons = icons,
             iconTargets = iconTargets,
-            query = query,
+            query = controls.query,
+            onlyUnmapped = controls.onlyUnmapped,
             loading = apps.isEmpty(),
-            importing = importing,
-            message = message,
+            importing = controls.importing,
+            message = controls.message,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MappingUiState())
 
@@ -148,6 +175,10 @@ class MappingViewModel(
 
     fun setQuery(query: String) {
         queryFlow.value = query
+    }
+
+    fun setOnlyUnmapped(only: Boolean) {
+        unmappedOnlyFlow.value = only
     }
 
     /**

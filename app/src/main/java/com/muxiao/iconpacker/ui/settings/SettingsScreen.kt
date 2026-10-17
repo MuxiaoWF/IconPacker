@@ -101,6 +101,14 @@ fun SettingsScreen(
                         label = { Text("v3") },
                     )
                 }
+                if (!(state.schemeV1 || state.schemeV2 || state.schemeV3)) {
+                    Text(
+                        text = "已全部关闭：新建设置保存时会被要求至少保留一种签名方案，" +
+                            "「创建」按钮将处于禁用状态",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
 
             SettingSection("导出产物文件名模板") {
