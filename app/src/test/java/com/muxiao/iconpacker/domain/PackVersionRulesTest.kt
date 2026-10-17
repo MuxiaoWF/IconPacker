@@ -72,10 +72,10 @@ class PackVersionRulesTest {
 
     @Test
     fun `numeric input maps to explicit value`() {
-        assertEquals(PackVersionRules.Parsed.Explicit(10), PackVersionRules.parseCode("10"))
+        assertEquals(PackVersionRules.parseCode("10"), PackVersionRules.Parsed.Explicit(10))
         assertEquals(
-            PackVersionRules.Parsed.Explicit(10),
             PackVersionRules.parseCode(" 10 "),
+            PackVersionRules.Parsed.Explicit(10),
         )
     }
 

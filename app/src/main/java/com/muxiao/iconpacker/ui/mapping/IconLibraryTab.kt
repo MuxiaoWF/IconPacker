@@ -35,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -209,7 +210,7 @@ fun ShapeBatchDialog(
     onDismiss: () -> Unit,
 ) {
     var shape by remember { mutableStateOf(IconShape.ROUNDED_RECT) }
-    var color by remember { mutableStateOf(android.graphics.Color.TRANSPARENT) }
+    var color by remember { mutableIntStateOf(android.graphics.Color.TRANSPARENT) }
     var overwriteEdited by remember { mutableStateOf(false) }
 
     AlertDialog(

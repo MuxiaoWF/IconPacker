@@ -2,7 +2,6 @@ package com.muxiao.iconpacker.domain
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** [AppMatcher] 单元测试：包名维度、评分规则、贪心分配、确定性与边界 */

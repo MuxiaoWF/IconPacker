@@ -56,9 +56,9 @@ class AxmlWriter(
         val pool = StringPool()
         // 收集阶段：所有字符串先入池，保证池完整后才可序列化
         collect(root, pool)
-        for (ns in namespaces) {
-            pool.intern(ns.prefix)
-            pool.intern(ns.uri)
+        for ((prefix, uri) in namespaces) {
+            pool.intern(prefix)
+            pool.intern(uri)
         }
 
         val body = ByteArrayOutputStream(4096)

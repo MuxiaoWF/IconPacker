@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  保护模板的 1024 个占位槽位（ic_0001 ~ ic_1024）不被资源收缩器当 unused 移除。
+
+  打包引擎（core/packer）只替换这些 PNG 的字节、永不改写 resources.arsc，
+  因此每个槽位必须预先编译进模板 APK 的 arsc。一旦被 shrinkResources 当
+  "未引用资源" 丢弃，模板即失效（可用槽位少于 1024，且引擎无法映射到缺失条目）。
+
+  本文件仅在 isShrinkResources=true 时生效；但即便当前关闭收缩，保留它可在
+  将来误开收缩时兜住底。通配符 @drawable/ic_* 覆盖全部 1024 个槽位。
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_*" />

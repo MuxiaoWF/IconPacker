@@ -75,7 +75,7 @@ abstract class IconPackerDatabase : RoomDatabase() {
         fun build(context: Context): IconPackerDatabase =
             Room.databaseBuilder(context, IconPackerDatabase::class.java, "iconpacker.db")
                 .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
-                .fallbackToDestructiveMigration()
+                .fallbackToDestructiveMigration(false)
                 .build()
     }
 }

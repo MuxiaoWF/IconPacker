@@ -80,23 +80,23 @@ object ImportBinder {
         // ---- L1：包内映射表（权威） ----
         // appfilter 的 drawable 是资源名，即"文件名去扩展名"。
         val iconByBareName = LinkedHashMap<String, Int>()
-        for (icon in icons) {
-            val key = IconMatchKeys.normalize(IconMatchKeys.stripImageExtension(icon.fileName))
-            iconByBareName.putIfAbsent(key, icon.index)
+        for ((index, fileName) in icons) {
+            val key = IconMatchKeys.normalize(IconMatchKeys.stripImageExtension(fileName))
+            iconByBareName.putIfAbsent(key, index)
         }
 
         // 同一组件只认第一次出现的条目：appfilter 理论上不该重复，但真出现了
         // 也要给出与条目顺序无关的稳定结果。
         val bindings = LinkedHashMap<String, Binding>()
-        for (entry in manifestEntries) {
-            val iconIndex = iconByBareName[IconMatchKeys.normalize(entry.drawable)] ?: continue
-            val packageName = IconPackManifest.packageOfComponent(entry.component) ?: continue
+        for ((component1, drawable) in manifestEntries) {
+            val iconIndex = iconByBareName[IconMatchKeys.normalize(drawable)] ?: continue
+            val packageName = IconPackManifest.packageOfComponent(component1) ?: continue
             // 已安装 → 换成设备上真实的启动组件（作者的写法可能指向别名 Activity，
             // 按整串相等去匹配会大面积落空）；
             // 未安装 → 保留 appfilter 原值。丢掉它就等于丢弃了这份映射，
             // 而那正是"以后装了新应用就能直接用上图标"的全部依据。
             val installedApp = appByPackage[packageName]
-            val component = installedApp?.component ?: entry.component
+            val component = installedApp?.component ?: component1
             if (component in skipComponents) continue
             bindings.putIfAbsent(
                 component,
@@ -110,16 +110,16 @@ object ImportBinder {
         // 但绑定器不该依赖调用方一定做对——多去一次已知图片扩展名永远不会误伤包名
         // （`com.android.chrome` 的 `chrome` 不是图片扩展名，原样保留）。
         val iconByPackageKey = LinkedHashMap<String, Int>()
-        for (icon in icons) {
-            val key = IconMatchKeys.normalize(IconMatchKeys.stripImageExtension(icon.matchKey))
-            iconByPackageKey.putIfAbsent(key, icon.index)
+        for ((index, _, matchKey) in icons) {
+            val key = IconMatchKeys.normalize(IconMatchKeys.stripImageExtension(matchKey))
+            iconByPackageKey.putIfAbsent(key, index)
         }
-        for (app in apps) {
-            if (app.component in skipComponents) continue
-            if (bindings.containsKey(app.component)) continue
-            val iconIndex = iconByPackageKey[IconMatchKeys.normalize(app.packageName)] ?: continue
-            bindings[app.component] =
-                Binding(app.component, iconIndex, Source.PACKAGE_NAME, installed = true)
+        for ((component, packageName) in apps) {
+            if (component in skipComponents) continue
+            if (bindings.containsKey(component)) continue
+            val iconIndex = iconByPackageKey[IconMatchKeys.normalize(packageName)] ?: continue
+            bindings[component] =
+                Binding(component, iconIndex, Source.PACKAGE_NAME, installed = true)
         }
 
         return bindings.values.toList()

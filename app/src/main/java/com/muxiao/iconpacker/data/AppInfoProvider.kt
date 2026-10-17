@@ -2,7 +2,6 @@ package com.muxiao.iconpacker.data
 
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.graphics.drawable.Drawable
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +29,7 @@ class AppInfoProvider(private val context: Context) {
         val resolved: List<ResolveInfo> = context.packageManager.queryIntentActivities(intent, 0)
         resolved.mapNotNull { info ->
             val activityInfo = info.activityInfo ?: return@mapNotNull null
-            val label = runCatching { info.loadLabel(context.packageManager)?.toString() }.getOrNull()
+            val label = runCatching { info.loadLabel(context.packageManager).toString() }.getOrNull()
                 ?: activityInfo.packageName
             AppEntry(
                 packageName = activityInfo.packageName,

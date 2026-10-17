@@ -44,4 +44,24 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    // 模板是"资源底座"：1024 个占位槽位 ic_0001~ic_1024 必须原样保留，
+    // 打包引擎只替换 PNG 字节、永不改写 resources.arsc。一旦被收缩器当 unused 丢弃即失效，
+    // 故显式关闭收缩（默认本就关闭，这里写死以防误复用 app 的 release 配置）。
+    buildTypes {
+        debug {
+            isMinifyEnabled = false
+            isShrinkResources = false
+        }
+        release {
+            isMinifyEnabled = false
+            isShrinkResources = false
+        }
+    }
+
+    lint {
+        // 占位槽位不会被任何代码/XML 引用（drawable.xml/appfilter.xml 是空占位），
+        // "unused resource" 报红属预期误报；禁用以免误触 "Remove Unused Resources" 批量删除。
+        disable += "UnusedResources"
+    }
 }

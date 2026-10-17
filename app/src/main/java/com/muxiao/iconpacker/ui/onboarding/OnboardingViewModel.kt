@@ -50,7 +50,7 @@ class OnboardingViewModel(
     }
 
     companion object {
-        fun factory(context: android.content.Context): ViewModelProvider.Factory = viewModelFactory {
+        fun factory(context: Context): ViewModelProvider.Factory = viewModelFactory {
             initializer { OnboardingViewModel(LauncherCompat(context)) }
         }
     }

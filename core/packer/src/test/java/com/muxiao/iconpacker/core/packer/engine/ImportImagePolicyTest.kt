@@ -52,13 +52,13 @@ class ImportImagePolicyTest {
 
     @Test
     fun `landscape source is scaled so that the long side hits the limit`() {
-        assertEquals(1440 to 1080, ImportImagePolicy.targetSize(4160, 3120))
+        assertEquals(ImportImagePolicy.targetSize(4160, 3120), 1440 to 1080)
     }
 
     @Test
     fun `portrait source keeps its orientation`() {
         // 3120x5547 竖图：长边在高上，缩放后高必须正好等于上限
-        assertEquals(809 to 1440, ImportImagePolicy.targetSize(3120, 5547))
+        assertEquals(ImportImagePolicy.targetSize(3120, 5547), 809 to 1440)
     }
 
     @Test
@@ -70,8 +70,8 @@ class ImportImagePolicyTest {
 
     @Test
     fun `target size never upscales`() {
-        assertEquals(512 to 384, ImportImagePolicy.targetSize(512, 384))
-        assertEquals(1 to 1, ImportImagePolicy.targetSize(1, 1))
+        assertEquals(ImportImagePolicy.targetSize(512, 384), 512 to 384)
+        assertEquals(ImportImagePolicy.targetSize(1, 1), 1 to 1)
     }
 
     @Test

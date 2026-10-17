@@ -1,5 +1,6 @@
 package com.muxiao.iconpacker
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
 import com.muxiao.iconpacker.data.AppInfoProvider
@@ -15,7 +16,16 @@ import kotlinx.coroutines.launch
 /**
  * 手动依赖注入（无 Hilt：本项目依赖面很小，手写 ServiceLocator 可读性更好，
  * 也避免引入第二注解处理器叠加构建风险）。
+ *
+ * 内存泄漏说明：[ServiceLocator] 是进程级单例（Kotlin `object` 即静态单例），
+ * 其持有的 [repository] / [installedPackChecker] 都间接保有一个 `Context`。
+ * 但 [init] 只会在 [IconPackerApplication.onCreate] 中以 `Application` 身份被调用，
+ * 下方一律传入 `context.applicationContext`，所以锁存的是 **Application 上下文**——
+ * 它与进程同寿，而 ServiceLocator 也随进程同寿，二者生命周期完全对齐，不存在泄漏。
+ * 该 lint（StaticFieldLeak）无法静态证明"只持有 Application 上下文"，故在此显式抑制，
+ * 属预期、可控、非隐患。
  */
+@SuppressLint("StaticFieldLeak")
 object ServiceLocator {
     lateinit var repository: PackRepository
         private set
@@ -24,15 +34,17 @@ object ServiceLocator {
 
     fun init(context: Context) {
         if (::repository.isInitialized) return
-        val db = IconPackerDatabase.build(context)
+        // 只锁存 Application 上下文，杜绝把 Activity/View 等短生命周期上下文存进静态单例
+        val appContext = context.applicationContext
+        val db = IconPackerDatabase.build(appContext)
         repository = PackRepository(
             packDao = db.packDao(),
             mappingDao = db.mappingDao(),
             assetDao = db.iconAssetDao(),
-            fileStore = IconFileStore(context),
-            appInfoProvider = AppInfoProvider(context),
+            fileStore = IconFileStore(appContext),
+            appInfoProvider = AppInfoProvider(appContext),
         )
-        installedPackChecker = InstalledPackChecker(context)
+        installedPackChecker = InstalledPackChecker(appContext)
     }
 }
 

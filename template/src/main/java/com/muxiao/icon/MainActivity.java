@@ -5,6 +5,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.annotation.SuppressLint;
 import android.content.res.XmlResourceParser;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -132,7 +133,6 @@ public class MainActivity extends Activity {
 
     /**
      * 读出一份编译后 XML 里的全部 `<item>`。
-     *
      * 属性优先按**名称**取；只有名称不可用（框架对自产 AXML 的兼容分支）时才按出现顺序兜底，
      * 且兜底依赖两份文件的固定形态：appfilter 恒为 `[component, drawable]`、drawable.xml 恒为
      * `[drawable]`（见 AppFilterFactory）。解析失败不抛给用户，退化成空列表 → 界面显示空态。
@@ -179,7 +179,6 @@ public class MainActivity extends Activity {
 
     /**
      * 从 component 里取出包名。
-     *
      * 与 core/packer 的 `IconPackManifest.packageOfComponent` 同一口径：appfilter 的 component
      * 写法很杂（`ComponentInfo{包名/活动}`、省略前缀、只给包名都会出现），一律只认斜杠前的包名。
      * 模板不依赖 core/packer，故此处独立实现一份（几十字节，不值得为它引依赖）。
@@ -200,7 +199,6 @@ public class MainActivity extends Activity {
 
     /**
      * 解析 arsc 里的资源包名。
-     *
      * 不能直接用 {@link #getPackageName()}：打包引擎只改写清单的 `package` 属性
      * （多包共存的前提，见 AxmlPatcher.setPackageName），resources.arsc 里仍是模板原值。
      * 两者的字符串不一致，而按名查资源（`getIdentifier`）依赖的是 arsc 里那个。
@@ -279,7 +277,7 @@ public class MainActivity extends Activity {
         try {
             ApplicationInfo info = getPackageManager().getApplicationInfo(getPackageName(), 0);
             CharSequence label = info.loadLabel(getPackageManager());
-            if (label != null && label.length() > 0) return label.toString();
+            if (label.length() > 0) return label.toString();
         } catch (PackageManager.NameNotFoundException ignored) {
             // 查询自己失败基本不可能，真失败了也不该因为标题而崩溃
         }
@@ -355,11 +353,15 @@ public class MainActivity extends Activity {
 
     /**
      * 按图标名取出产物里的 drawable。
-     *
      * 三级查找：arsc 资源包名 → 清单包名 → 放弃（行里只有文字）。前两级覆盖"包名被改写 /
      * 未被改写"两种产物；都取不到说明资源名对不上（模板与引擎的槽位命名漂移），
      * 此时静默降级比抛异常好——界面其余内容仍然可用。
+     * 必须用 {@link android.content.res.Resources#getIdentifier} 按名查：图标名
+     * （ic_0001…ic_1024）是运行时从 drawable.xml 解析出来的动态数据，编译期无法用
+     * R.drawable.xxx 静态引用，故这里无法避免资源反射。该 lint 警告（DiscouragedApi）
+     * 对"动态资源名"场景属预期，显式抑制。
      */
+    @SuppressLint("DiscouragedApi")
     private Drawable loadIcon(String name) {
         Integer cached = iconIds.get(name);
         int id = cached == null ? 0 : cached;

@@ -175,7 +175,7 @@ object AxmlPatcher {
         var poolStart = -1
         var poolEnd = -1
         var strings: List<String> = emptyList()
-        var rawIndex = -1
+        var rawIndex: Int
 
         var off = 8
         val total = AxmlReader.readU32(data, 4)

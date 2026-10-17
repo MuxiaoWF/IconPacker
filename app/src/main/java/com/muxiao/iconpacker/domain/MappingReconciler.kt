@@ -42,7 +42,10 @@ object MappingReconciler {
         if (mappings.isEmpty() || apps.isEmpty()) return emptyList()
 
         val componentByPackage = HashMap<String, String>(apps.size)
-        for (app in apps) componentByPackage.putIfAbsent(app.packageName, app.component)
+        for ((component, packageName) in apps) componentByPackage.putIfAbsent(
+            packageName,
+            component
+        )
         val occupied = mappings.mapTo(HashSet()) { it.first }
 
         val fixes = ArrayList<Fix>()

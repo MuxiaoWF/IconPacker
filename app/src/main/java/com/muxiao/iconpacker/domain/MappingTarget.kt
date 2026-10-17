@@ -131,11 +131,10 @@ object MappingTarget {
      */
     private fun isValidActivity(activity: String, packageName: String): Boolean {
         val full = qualify(packageName, activity)
-        if (full.length > PackageNameRules.MAX_LENGTH) return false
-        return full.split('.').all { segment ->
+        return full.length <= PackageNameRules.MAX_LENGTH && full.split('.').all { segment ->
             segment.isNotEmpty() &&
-                (isLetter(segment[0]) || segment[0] == '_' || segment[0] == '$') &&
-                segment.all { isLetter(it) || it in '0'..'9' || it == '_' || it == '$' }
+                    (isLetter(segment[0]) || segment[0] == '_' || segment[0] == '$') &&
+                    segment.all { isLetter(it) || it in '0'..'9' || it == '_' || it == '$' }
         }
     }
 

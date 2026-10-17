@@ -102,7 +102,6 @@ class IconEditorViewModel(
     }
 
     fun save() {
-        val path = originalPath ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(saving = true) }
             runCatching { repository.saveIconEdit(packId, slot, styleFlow.value) }

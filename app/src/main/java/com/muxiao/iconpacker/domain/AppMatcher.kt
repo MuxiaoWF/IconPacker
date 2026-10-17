@@ -64,11 +64,11 @@ object AppMatcher {
 
         val pending = entries.filter { it.component !in skipComponents }
         val scored = ArrayList<Scored>()
-        for (entry in pending) {
+        for ((component, label, packageName) in pending) {
             for (candidate in candidates) {
-                val s = score(entry.label, entry.packageName, candidate.originalName)
+                val s = score(label, packageName, candidate.originalName)
                 if (s >= THRESHOLD) {
-                    scored.add(Scored(entry.component, candidate, s))
+                    scored.add(Scored(component, candidate, s))
                 }
             }
         }
@@ -80,12 +80,12 @@ object AppMatcher {
         val usedSlots = HashSet<Int>()
         val usedComponents = HashSet<String>()
         val result = HashMap<String, Int>()
-        for (s in scored) {
-            if (s.candidate.slot in usedSlots) continue
-            if (s.component in usedComponents) continue
-            usedSlots.add(s.candidate.slot)
-            usedComponents.add(s.component)
-            result[s.component] = s.candidate.slot
+        for ((component, candidate) in scored) {
+            if (candidate.slot in usedSlots) continue
+            if (component in usedComponents) continue
+            usedSlots.add(candidate.slot)
+            usedComponents.add(component)
+            result[component] = candidate.slot
         }
         return result
     }

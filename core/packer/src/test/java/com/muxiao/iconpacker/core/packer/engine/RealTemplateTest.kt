@@ -1,7 +1,6 @@
 package com.muxiao.iconpacker.core.packer.engine
 
 import com.muxiao.iconpacker.core.packer.arsc.ArscPatcher
-import com.muxiao.iconpacker.core.packer.axml.AxmlElement
 import com.muxiao.iconpacker.core.packer.axml.AxmlReader
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -92,9 +91,7 @@ class RealTemplateTest {
 
         // STORED 压缩方式必须在重写后保留
         val zip = java.util.zip.ZipInputStream(java.io.ByteArrayInputStream(out)).use { zs ->
-            generateSequence(zs.nextEntry) { zs.nextEntry }
-                .filter { it.name == "resources.arsc" }
-                .first()
+            generateSequence(zs.nextEntry) { zs.nextEntry }.first { it.name == "resources.arsc" }
                 .method
         }
         assertEquals(

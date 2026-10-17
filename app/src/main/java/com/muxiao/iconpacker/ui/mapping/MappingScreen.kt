@@ -23,7 +23,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
@@ -37,11 +37,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -59,6 +59,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Image
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.muxiao.iconpacker.data.AppInfoProvider
@@ -105,7 +106,7 @@ fun MappingScreen(
     var targetDraft by remember { mutableStateOf<TargetDraft?>(null) }
     var detailIcon by remember { mutableStateOf<IconAssetEntity?>(null) }
     var showShapeBatch by remember { mutableStateOf(false) }
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     // 照片选择器（免存储权限）
     val photoPicker = rememberLauncherForActivityResult(
@@ -133,7 +134,7 @@ fun MappingScreen(
                 title = { Text(state.packName.ifBlank { "映射工作台" }) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
                 actions = {
@@ -188,7 +189,7 @@ fun MappingScreen(
                 }
             }
 
-            TabRow(selectedTabIndex = selectedTab) {
+            PrimaryTabRow(selectedTabIndex = selectedTab) {
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
@@ -341,7 +342,6 @@ fun MappingScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppRowItem(
     app: AppRow,
@@ -441,7 +441,6 @@ private fun AppIconThumb(packageName: String) {
  * 真实启动组件为准（见 [MappingTarget]），不把这一步藏起来，用户才能确信
  * "我填的东西真的生效了"。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MappingTargetDialog(
     draft: TargetDraft,
@@ -539,7 +538,6 @@ private fun MappingTargetDialog(
 }
 
 /** 本机已安装应用选择器（可搜索） */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun InstalledAppPickerDialog(
     apps: List<AppRow>,
@@ -607,7 +605,6 @@ private fun InstalledAppPickerDialog(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun IconPickerDialog(
     icons: List<IconAssetEntity>,

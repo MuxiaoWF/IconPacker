@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      API 29+：升级为 DayNight 外壳，使系统状态栏 / 导航栏在深色模式下自动反色，
+      与 Compose MaterialTheme 的深色主题保持一致。Theme.DeviceDefault.DayNight
+      仅在 API 29 起可用，故单独放在 values-v29 限定目录；基础 values/themes.xml
+      用 Theme.DeviceDefault.Light 兼容 minSdk 24。
+    -->
+    <style name="Theme.IconPacker" parent="@android:style/Theme.DeviceDefault.DayNight">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+</resources>

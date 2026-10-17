@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+<!--
+  IconLauncherShape 抑制说明：本应用图标是"实心纯色背景(#1E2B1A) + 居中 logo"的标准
+  Material 自适应图标风格（背景满铺、logo 落在 108dp 安全区内）。这种风格在系统套用
+  圆角/方圆形蒙版后，外轮廓就是蒙版形状本身——这正是本设计的有意结果，并非缺陷。
+  IconLauncherShape 仅是对"外轮廓不够独特"的**风格建议**，对 logo-on-color 设计属预期误报，
+  故在此显式忽略。
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="IconLauncherShape">
     <background android:drawable="@drawable/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
     <monochrome android:drawable="@drawable/ic_launcher_foreground" />

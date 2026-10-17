@@ -480,7 +480,7 @@ class PackRepository(
     fun latestArtifactPath(packId: Long): String? = fileStore.latestArtifact(packId)?.absolutePath
 
     /** 导出最新产物到用户选定 Uri；返回写入字节数 */
-    suspend fun exportLatestArtifact(packId: Long, target: android.net.Uri): Long {
+    suspend fun exportLatestArtifact(packId: Long, target: Uri): Long {
         val artifact = fileStore.latestArtifact(packId) ?: error("没有可导出的产物，请先打包")
         return fileStore.exportArtifact(artifact, target)
     }

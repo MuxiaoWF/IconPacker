@@ -79,7 +79,7 @@ class AndroidKeystoreKeyProvider(
         }
         throw IllegalStateException(
             "设备 Keystore 生成签名密钥失败（已依次尝试 StrongBox 与普通 Keystore）：" +
-                "${lastError?.message ?: "未知原因"}",
+                    (lastError?.message ?: "未知原因"),
             lastError,
         )
     }

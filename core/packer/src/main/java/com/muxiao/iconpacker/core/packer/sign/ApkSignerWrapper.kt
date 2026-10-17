@@ -77,12 +77,12 @@ class ApkSignerWrapper {
             throw IOException("签名产物校验失败：$errors")
         }
         val cert = result.signerCertificates?.firstOrNull()
-        return cert?.subjectX500Principal?.toString() ?: identityFallback
+        return cert?.subjectX500Principal?.toString() ?: IDENTITY_FALLBACK
     }
 
     companion object {
         /** 与工程 minSdk 一致：v1 兼容下限，v2/v3 由 apksig 按平台能力取舍 */
         const val MIN_SDK = 24
-        private const val identityFallback = "unknown"
+        private const val IDENTITY_FALLBACK = "unknown"
     }
 }

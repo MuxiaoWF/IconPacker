@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-      Compose 宿主主题：仅提供无 ActionBar 的 DayNight 外壳，
+      Compose 宿主主题：仅提供无 ActionBar 的外壳，
       全部视觉由 ui/theme/Theme.kt（Material 3 + 动态取色）承载。
 
       注意：勿加 android:windowLayoutFlags——那是非公开框架属性，
@@ -11,8 +11,13 @@
       parent 用 framework 内置主题而非 Theme.Material3.*（后者来自
       com.google.android.material，已随体积优化移除）：本应用视觉 100% 由
       Compose MaterialTheme 绘制，XML 主题只负责窗口外壳与状态栏，无差异。
+
+      Theme.DeviceDefault.DayNight 需 API 29，而 app 的 minSdk=24；
+      此处用 Theme.DeviceDefault.Light 兼容 24+，API 29+ 在
+      values-v29/themes.xml 里升级为 DayNight（系统栏深色自动反色）。
+      否则在 24~28 设备上引用该主题会运行时崩溃。
     -->
-    <style name="Theme.IconPacker" parent="@android:style/Theme.DeviceDefault.DayNight">
+    <style name="Theme.IconPacker" parent="@android:style/Theme.DeviceDefault.Light">
         <item name="android:windowNoTitle">true</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
     </style>

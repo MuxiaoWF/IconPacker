@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import android.graphics.BitmapFactory
+import androidx.core.graphics.createBitmap
 
 /**
  * 从私有目录文件路径加载图标（MVP 不引第三方图片库；
@@ -46,7 +47,7 @@ internal fun sampleSizeFor(width: Int, height: Int, maxPx: Int): Int {
 internal fun android.graphics.drawable.Drawable.toImageBitmap(): ImageBitmap {
     val w = intrinsicWidth.coerceAtLeast(1)
     val h = intrinsicHeight.coerceAtLeast(1)
-    val bitmap = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+    val bitmap = createBitmap(w, h)
     val canvas = android.graphics.Canvas(bitmap)
     setBounds(0, 0, canvas.width, canvas.height)
     draw(canvas)

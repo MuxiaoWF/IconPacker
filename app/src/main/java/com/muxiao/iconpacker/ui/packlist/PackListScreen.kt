@@ -228,7 +228,6 @@ fun PackListScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PackItem(
     pack: PackEntity,
@@ -312,7 +311,6 @@ private fun PackItem(
  *
  * @param installedVersionCode 设备上已安装产物的版本号；null = 未安装（无须提示降级）
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditPackDialog(
     pack: PackEntity,
@@ -434,8 +432,8 @@ private fun EditPackDialog(
                     supportingText = {
                         Text(
                             text = packageIssue?.message
-                                ?: "每个图标包需要独立包名才能在系统里共存；改包名后要重新打包安装，" +
-                                "旧包名会作为独立应用留在设备上（可自行卸载）",
+                                ?: ("每个图标包需要独立包名才能在系统里共存；改包名后要重新打包安装，" +
+                                        "旧包名会作为独立应用留在设备上（可自行卸载）"),
                             style = MaterialTheme.typography.labelSmall,
                         )
                     },
@@ -535,7 +533,6 @@ private fun PackIconThumbnail(path: String? = null, uri: Uri? = null) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CreatePackDialog(
     iconUri: Uri?,

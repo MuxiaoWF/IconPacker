@@ -80,8 +80,8 @@ class MappingTargetTest {
     @Test
     fun `inner class activity with dollar sign is accepted`() {
         assertEquals(
-            "ComponentInfo{com.foo.bar/com.foo.bar.Main\$Entry}",
-            resolved("com.foo.bar/com.foo.bar.Main\$Entry", apps = emptyList()).component,
+            $$"ComponentInfo{com.foo.bar/com.foo.bar.Main$Entry}",
+            resolved($$"com.foo.bar/com.foo.bar.Main$Entry", apps = emptyList()).component,
         )
     }
 

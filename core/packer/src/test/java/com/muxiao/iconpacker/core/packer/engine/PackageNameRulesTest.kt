@@ -63,7 +63,7 @@ class PackageNameRulesTest {
         assertEquals(PackageNameRules.Issue.INVALID_CHARS, PackageNameRules.validate("com.a b"))
         // 非 ASCII 出现在段中间：首字符合法，问题出在字符集
         assertEquals(PackageNameRules.Issue.INVALID_CHARS, PackageNameRules.validate("com.a中"))
-        assertEquals(PackageNameRules.Issue.INVALID_CHARS, PackageNameRules.validate("com.a\$b"))
+        assertEquals(PackageNameRules.Issue.INVALID_CHARS, PackageNameRules.validate($$"com.a$b"))
     }
 
     /** 非 ASCII 出现在段首：先命中"段首必须是字母或下划线"这一条 */

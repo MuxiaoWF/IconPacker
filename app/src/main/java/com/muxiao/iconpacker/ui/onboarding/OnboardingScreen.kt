@@ -37,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.muxiao.iconpacker.data.LauncherCompat
 import com.muxiao.iconpacker.data.LauncherSupport
+import androidx.core.content.edit
 
 /**
  * 首次启动引导（FR-01）。
@@ -80,8 +81,7 @@ fun OnboardingScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "多数 OEM 系统启动器（Pixel Launcher、One UI Home、MIUI 等）" +
-                            "使用自有主题机制，不直接应用标准第三方图标包；但 ColorOS 11+ 已支持" +
-                            "第三方图标包。最稳妥的方式是安装一个支持图标包的启动器" +
+                            "使用自有主题机制，不直接应用标准第三方图标包；最稳妥的方式是安装一个支持图标包的启动器" +
                             "（如 Nova、Lawnchair、Apex），并在其图标样式设置里启用本应用生成的图标包。",
                         style = MaterialTheme.typography.bodyMedium,
                     )
@@ -219,8 +219,8 @@ object OnboardingPrefs {
 
     fun setDone(context: Context) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean(KEY_SHOWN, true)
-            .apply()
+            .edit {
+                putBoolean(KEY_SHOWN, true)
+            }
     }
 }

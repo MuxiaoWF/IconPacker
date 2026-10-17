@@ -69,7 +69,7 @@ class IconFileStore(
             .toLongOrNull() ?: 0L
 
     /** 导出产物到用户选定的 Uri（SAF，无需存储权限）；返回写入字节数 */
-    suspend fun exportArtifact(source: File, target: android.net.Uri): Long =
+    suspend fun exportArtifact(source: File, target: Uri): Long =
         withContext(Dispatchers.IO) {
             context.contentResolver.openOutputStream(target)?.use { out ->
                 source.inputStream().use { input -> input.copyTo(out) }

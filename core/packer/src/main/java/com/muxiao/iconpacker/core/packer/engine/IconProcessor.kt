@@ -12,6 +12,7 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.pow
 import kotlin.math.sin
+import kotlin.math.sign
 
 /** 图标外形（FR-05 批量统一化与单张编辑共用）。作为**裁剪蒙版**独立生效，与背景色无关。 */
 enum class IconShape {
@@ -83,7 +84,7 @@ data class IconStyle(
         const val DEFAULT_CORNER_RATIO = 0.25f
 
         /** 默认边框色：白色。深色图标上白边清晰，且不会像品牌蓝那样突兀 */
-        val DEFAULT_BORDER_COLOR = Color.WHITE
+        const val DEFAULT_BORDER_COLOR = Color.WHITE
 
         /** 背景色候选（编辑器色板；第 0 项透明 = 不画背景，也是默认项） */
         val PRESET_COLORS = listOf(
@@ -357,8 +358,8 @@ class IconProcessor(
                 val st = sin(t)
                 // 全程 Double 运算后一次性转 Float：a 是 Float，与 Double 相乘会提升为
                 // Double，若混算会让 path.moveTo/lineTo 收到 Double 而编译失败
-                val x = (a * Math.signum(ct) * abs(ct).pow(2.0 / n)).toFloat()
-                val y = (a * Math.signum(st) * abs(st).pow(2.0 / n)).toFloat()
+                val x = (a * sign(ct) * abs(ct).pow(2.0 / n)).toFloat()
+                val y = (a * sign(st) * abs(st).pow(2.0 / n)).toFloat()
                 if (i == 0) path.moveTo(c + x, c + y) else path.lineTo(c + x, c + y)
             }
             path.close()

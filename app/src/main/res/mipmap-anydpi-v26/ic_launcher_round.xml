@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+<!--
+  IconLauncherShape 抑制说明：见同目录 ic_launcher.xml。本应用图标为"实心纯色背景 +
+  居中 logo"的标准自适应图标风格，蒙版后外轮廓即蒙版形状本身，属有意设计；
+  IconLauncherShape 对其属预期误报，故显式忽略。
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="IconLauncherShape">
     <background android:drawable="@drawable/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
     <monochrome android:drawable="@drawable/ic_launcher_foreground" />

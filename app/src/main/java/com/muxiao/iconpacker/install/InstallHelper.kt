@@ -8,6 +8,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import java.io.File
+import androidx.core.net.toUri
 
 /**
  * 安装与分享辅助（FR-07）。
@@ -34,16 +35,13 @@ object InstallHelper {
      * API 26 起为 per-app 权限；API 24/25 无 per-app 概念（全局开关），直接放行。
      */
     fun canInstallPackages(context: Context): Boolean =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.packageManager.canRequestPackageInstalls()
-        } else {
-            true
-        }
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.O || context.packageManager.canRequestPackageInstalls()
 
     /** 跳转授权页：API 26+ 为本应用专页，低版本回退安全设置总页 */
     fun unknownSourcesSettingsIntent(context: Context): Intent =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
+            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                "package:${context.packageName}".toUri())
         } else {
             Intent(Settings.ACTION_SECURITY_SETTINGS)
         }
