@@ -32,7 +32,10 @@ class PackAssemblerTest {
     private val androidNs = "http://schemas.android.com/apk/res/android"
 
     /** 假模板 ZIP：自产清单 + arsc 占位 + 空 appfilter/drawable + 槽位图 + 调试签名 */
-    private fun buildTemplate(): ByteArray {
+    private fun buildTemplate(
+        withAppmap: Boolean = false,
+        withUsesSdk: Boolean = false,
+    ): ByteArray {
         val manifestDoc = AxmlElement(
             name = "manifest",
             attributes = listOf(
@@ -42,37 +45,52 @@ class PackAssemblerTest {
                 // 字符串属性注入清单（实测 "1.0"），引擎的版本名替换以它的存在为前提
                 AxmlAttr("versionName", AttrValue.Str("1.0"), nsUri = androidNs),
             ),
-            children = listOf(
-                AxmlElement(
-                    name = "application",
-                    attributes = listOf(
-                        AxmlAttr("label", AttrValue.Str("My Icon Pack"), nsUri = androidNs),
-                        AxmlAttr("icon", AttrValue.Ref(0x7F080001, "@mipmap/ic_launcher"), nsUri = androidNs),
-                    ),
-                    children = listOf(
+            children = buildList {
+                if (withUsesSdk) {
+                    // 与真实模板一致：aapt2 会把 defaultConfig 的 min/targetSdk 以
+                    // 整数字面量注入 <uses-sdk>（prod defaultConfig = 24/37）
+                    add(
                         AxmlElement(
-                            name = "activity",
-                            attributes = listOf(AxmlAttr("name", AttrValue.Str(".MainActivity"), nsUri = androidNs)),
-                            // 抽屉主入口：category 由引擎在 LAUNCHER/DEFAULT 间切换
-                            children = listOf(
-                                AxmlElement(
-                                    name = "intent-filter",
-                                    children = listOf(
-                                        AxmlElement(
-                                            name = "action",
-                                            attributes = listOf(AxmlAttr("name", AttrValue.Str("android.intent.action.MAIN"), nsUri = androidNs)),
-                                        ),
-                                        AxmlElement(
-                                            name = "category",
-                                            attributes = listOf(AxmlAttr("name", AttrValue.Str("android.intent.category.LAUNCHER"), nsUri = androidNs)),
+                            name = "uses-sdk",
+                            attributes = listOf(
+                                AxmlAttr("minSdkVersion", AttrValue.IntVal(24), nsUri = androidNs),
+                                AxmlAttr("targetSdkVersion", AttrValue.IntVal(37), nsUri = androidNs),
+                            ),
+                        ),
+                    )
+                }
+                add(
+                    AxmlElement(
+                        name = "application",
+                        attributes = listOf(
+                            AxmlAttr("label", AttrValue.Str("My Icon Pack"), nsUri = androidNs),
+                            AxmlAttr("icon", AttrValue.Ref(0x7F080001, "@mipmap/ic_launcher"), nsUri = androidNs),
+                        ),
+                        children = listOf(
+                            AxmlElement(
+                                name = "activity",
+                                attributes = listOf(AxmlAttr("name", AttrValue.Str(".MainActivity"), nsUri = androidNs)),
+                                // 抽屉主入口：category 由引擎在 LAUNCHER/DEFAULT 间切换
+                                children = listOf(
+                                    AxmlElement(
+                                        name = "intent-filter",
+                                        children = listOf(
+                                            AxmlElement(
+                                                name = "action",
+                                                attributes = listOf(AxmlAttr("name", AttrValue.Str("android.intent.action.MAIN"), nsUri = androidNs)),
+                                            ),
+                                            AxmlElement(
+                                                name = "category",
+                                                attributes = listOf(AxmlAttr("name", AttrValue.Str("android.intent.category.LAUNCHER"), nsUri = androidNs)),
+                                            ),
                                         ),
                                     ),
                                 ),
                             ),
                         ),
                     ),
-                ),
-            ),
+                )
+            },
         )
         val manifest = AxmlWriter(
             namespaces = listOf(AxmlWriter.Namespace("android", androidNs)),
@@ -88,6 +106,10 @@ class PackAssemblerTest {
             zos.write(AxmlWriter().write(AxmlElement("resources"))); zos.closeEntry()
             zos.putNextEntry(ZipEntry("res/xml/drawable.xml"))
             zos.write(AxmlWriter().write(AxmlElement("resources"))); zos.closeEntry()
+            if (withAppmap) {
+                zos.putNextEntry(ZipEntry("res/xml/appmap.xml"))
+                zos.write(AxmlWriter().write(AxmlElement("appmap"))); zos.closeEntry()
+            }
             // 条目名必须与真实模板（aapt2 产物）一致：源工程的 res/drawable-xxxhdpi/
             // 编译后是 res/drawable-xxxhdpi-v4/。夹具与真实模板不一致，正是"图标写入
             // 孤儿条目、arsc 仍指向占位图"这个 bug 长期逃逸的原因——务必保持同步。
@@ -399,6 +421,189 @@ class PackAssemblerTest {
                 category.attributes.single { it.name == "name" }.rawValue,
             )
         }
+    }
+
+    /**
+     * appmap.xml（CandyBar/Blueprint 生态组件映射，Atom Launcher 消费）：
+     * 模板登记了该资源时按映射生成；class 是完整类名（相对名以包名展开）。
+     */
+    @Test
+    fun `appmap entries carry class and name for mapped components`() {
+        val template = buildTemplate(withAppmap = true)
+        val out = PackAssembler.buildUnsigned(
+            template = template,
+            packName = "P",
+            versionCode = 1,
+            mappings = listOf(
+                IconMapping("ComponentInfo{com.android.chrome/com.google.android.apps.chrome.Main}", 1),
+                IconMapping("ComponentInfo{com.android.settings/.Settings}", 2),
+            ),
+            iconBytes = mapOf(1 to byteArrayOf(1), 2 to byteArrayOf(2)),
+        )
+        val appmap = AxmlReader(ZipUtils.readEntry(out, "res/xml/appmap.xml")!!)
+        assertEquals("appmap", appmap.root.name)
+        assertEquals(2, appmap.root.children.size)
+        assertEquals(
+            "com.google.android.apps.chrome.Main",
+            appmap.root.children[0].attributes.single { it.name == "class" }.rawValue,
+        )
+        assertEquals(
+            "ic_0001",
+            appmap.root.children[0].attributes.single { it.name == "name" }.rawValue,
+        )
+        assertEquals(
+            "com.android.settings.Settings",
+            appmap.root.children[1].attributes.single { it.name == "class" }.rawValue,
+        )
+        assertEquals(
+            "ic_0002",
+            appmap.root.children[1].attributes.single { it.name == "name" }.rawValue,
+        )
+    }
+
+    /**
+     * appmap 归一化：仅给包名（`ComponentInfo{pkg/}`）的条目没有类名可写，
+     * 直接丢弃——Atom 对残缺条目不生效，写进去等于误导。
+     */
+    @Test
+    fun `appmap drops entries without an activity class`() {
+        val template = buildTemplate(withAppmap = true)
+        val out = PackAssembler.buildUnsigned(
+            template = template,
+            packName = "P",
+            versionCode = 1,
+            mappings = listOf(IconMapping("ComponentInfo{com.orphan/}", 1)),
+            iconBytes = mapOf(1 to byteArrayOf(1)),
+        )
+        val appmap = AxmlReader(ZipUtils.readEntry(out, "res/xml/appmap.xml")!!)
+        assertEquals(0, appmap.root.children.size)
+    }
+
+    /** 合成/第三方模板未登记 appmap 时降级跳过，绝不追加 arsc 不认识的条目 */
+    @Test
+    fun `template without appmap entry stays orphan free`() {
+        val template = buildTemplate(withAppmap = false)
+        val out = PackAssembler.buildUnsigned(
+            template = template,
+            packName = "P",
+            versionCode = 1,
+            mappings = listOf(IconMapping("ComponentInfo{a/.A}", 1)),
+            iconBytes = mapOf(1 to byteArrayOf(1)),
+        )
+        assertFalse(ZipUtils.hasEntry(out, "res/xml/appmap.xml"))
+    }
+
+    /**
+     * SDK 重写：\<uses-sdk\> 是整数字面量（aapt2 从 defaultConfig 注入），
+     * 与 versionCode 同一条原地改写路径。只重写用户提供的那一侧。
+     */
+    @Test
+    fun `sdk overrides patch uses-sdk in place`() {
+        val template = buildTemplate(withUsesSdk = true)
+        val out = PackAssembler.buildUnsigned(
+            template = template,
+            packName = "P",
+            versionCode = 1,
+            mappings = listOf(IconMapping("ComponentInfo{a/.A}", 1)),
+            iconBytes = mapOf(1 to "WEBP-1".toByteArray()),
+            minSdkOverride = 26,
+            targetSdkOverride = 29,
+        )
+        val manifest = AxmlReader(ZipUtils.readEntry(out, "AndroidManifest.xml")!!)
+        val usesSdk = manifest.root.children.single { it.name == "uses-sdk" }
+        assertEquals(26, usesSdk.attributes.single { it.name == "minSdkVersion" }.data)
+        assertEquals(29, usesSdk.attributes.single { it.name == "targetSdkVersion" }.data)
+        // 其余清单字段不受原地改写影响
+        assertEquals(1, manifest.root.attributes.single { it.name == "versionCode" }.data)
+    }
+
+    /** 只重写 targetSdk：minSdk 保持模板值（不反写基准常量） */
+    @Test
+    fun `target sdk override leaves min sdk as is`() {
+        val template = buildTemplate(withUsesSdk = true)
+        val out = PackAssembler.buildUnsigned(
+            template = template,
+            packName = "P",
+            versionCode = 1,
+            mappings = listOf(IconMapping("ComponentInfo{a/.A}", 1)),
+            iconBytes = mapOf(1 to "WEBP-1".toByteArray()),
+            targetSdkOverride = 29,
+        )
+        val usesSdk = AxmlReader(ZipUtils.readEntry(out, "AndroidManifest.xml")!!)
+            .root.children.single { it.name == "uses-sdk" }
+        assertEquals(24, usesSdk.attributes.single { it.name == "minSdkVersion" }.data)
+        assertEquals(29, usesSdk.attributes.single { it.name == "targetSdkVersion" }.data)
+    }
+
+    /** 未传重写值：清单保持模板原样 */
+    @Test
+    fun `uses-sdk untouched without overrides`() {
+        val template = buildTemplate(withUsesSdk = true)
+        val out = PackAssembler.buildUnsigned(
+            template = template,
+            packName = "P",
+            versionCode = 1,
+            mappings = listOf(IconMapping("ComponentInfo{a/.A}", 1)),
+            iconBytes = mapOf(1 to "WEBP-1".toByteArray()),
+        )
+        val usesSdk = AxmlReader(ZipUtils.readEntry(out, "AndroidManifest.xml")!!)
+            .root.children.single { it.name == "uses-sdk" }
+        assertEquals(24, usesSdk.attributes.single { it.name == "minSdkVersion" }.data)
+        assertEquals(37, usesSdk.attributes.single { it.name == "targetSdkVersion" }.data)
+    }
+
+    /** PackRequest 校验：minSdk/相对 target 重写非法值必须拒绝 */
+    @Test
+    fun `uses-sdk overrides are validated in pack request`() {
+        val stubProvider = object : com.muxiao.iconpacker.core.packer.sign.SigningKeyProvider {
+            override fun getOrCreate() = error("测试桩不应被调用")
+        }
+        // minSdk 低于下限
+        val ex1 = assertThrows(IllegalArgumentException::class.java) {
+            PackRequest(
+                packName = "P",
+                versionCode = 1,
+                mappings = listOf(IconMapping("a", 1)),
+                icons = listOf(SlotIcon(1, "/tmp/x.png")),
+                templateApkPath = "/tmp/t.apk",
+                signingKeyProvider = stubProvider,
+                overrideMinSdk = 20,
+                outputPath = "/tmp/out.apk",
+            )
+        }
+        assertTrue(ex1.message!!.contains("minSdk"))
+        // target < min
+        val ex2 = assertThrows(IllegalArgumentException::class.java) {
+            PackRequest(
+                packName = "P",
+                versionCode = 1,
+                mappings = listOf(IconMapping("a", 1)),
+                icons = listOf(SlotIcon(1, "/tmp/x.png")),
+                templateApkPath = "/tmp/t.apk",
+                signingKeyProvider = stubProvider,
+                overrideMinSdk = 26,
+                overrideTargetSdk = 25,
+                outputPath = "/tmp/out.apk",
+            )
+        }
+        assertTrue(ex2.message!!.contains("targetSdk"))
+    }
+
+    /** 模板缺 <uses-sdk> 时降级保持模板清单，不让打包失败 */
+    @Test
+    fun `sdk override degrades gracefully when template has no uses-sdk`() {
+        val template = buildTemplate(withUsesSdk = false)
+        val out = PackAssembler.buildUnsigned(
+            template = template,
+            packName = "P",
+            versionCode = 1,
+            mappings = listOf(IconMapping("ComponentInfo{a/.A}", 1)),
+            iconBytes = mapOf(1 to "WEBP-1".toByteArray()),
+            minSdkOverride = 26,
+        )
+        val manifest = AxmlReader(ZipUtils.readEntry(out, "AndroidManifest.xml")!!)
+        assertTrue(manifest.root.children.none { it.name == "uses-sdk" })
+        assertEquals(1, manifest.root.attributes.single { it.name == "versionCode" }.data)
     }
 
     /** 非法包名必须在装配前被拒绝，绝不能产出一个装不上（或覆盖他人）的 APK */

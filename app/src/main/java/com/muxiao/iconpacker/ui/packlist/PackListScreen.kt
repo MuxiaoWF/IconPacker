@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -59,6 +60,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.muxiao.iconpacker.data.AppSettings
+import com.muxiao.iconpacker.data.IconFileStore
 import com.muxiao.iconpacker.data.PackEntity
 import com.muxiao.iconpacker.data.toSignConfig
 import com.muxiao.iconpacker.domain.PackVersionRules
@@ -73,15 +76,18 @@ import com.muxiao.iconpacker.domain.PackVersionRules
 @Composable
 fun PackListScreen(
     onOpenPack: (Long) -> Unit,
+    onOpenSettings: () -> Unit,
     viewModel: PackListViewModel = viewModel(factory = PackListViewModel.factory()),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     // 新建：表单整体提升到 Screen（对话框只负责呈现与提交），启动器图标与
     // 密钥库文件的 SAF 结果要跨 Activity 生命周期回填表单，必须放在对话框外
     var createForm by remember { mutableStateOf<PackForm?>(null) }
     var pendingDelete by remember { mutableStateOf<PackEntity?>(null) }
     var pendingExport by remember { mutableStateOf<PackEntity?>(null) }
+    var pendingBackupExport by remember { mutableStateOf<PackEntity?>(null) }
     var pendingEdit by remember { mutableStateOf<PackEntity?>(null) }
     // 编辑：对话框打开时以当前项目为初值建一份表单副本；保存时统一按差异写库
     var pendingEditForm by remember { mutableStateOf<PackForm?>(null) }
@@ -142,6 +148,22 @@ fun PackListScreen(
         pendingExport = null
     }
 
+    // 导出项目备份 ZIP（v8）
+    val backupExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri ->
+        val pack = pendingBackupExport
+        if (uri != null && pack != null) viewModel.exportProjectBackup(pack, uri)
+        pendingBackupExport = null
+    }
+
+    // 导入项目备份 ZIP（v8）：完成即跳转新项目的映射工作台
+    val backupImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) viewModel.importProjectBackup(uri)
+    }
+
     LaunchedEffect(state.message) {
         state.message?.let {
             snackbarHostState.showSnackbar(it)
@@ -158,10 +180,27 @@ fun PackListScreen(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("我的图标包") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("我的图标包") },
+                actions = {
+                    TextButton(
+                        onClick = {
+                            backupImportLauncher.launch(
+                                arrayOf("application/zip", "application/x-zip-compressed"),
+                            )
+                        },
+                        enabled = !state.importingBackup,
+                    ) { Text(if (state.importingBackup) "导入中" else "导入") }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "设置")
+                    }
+                },
+            )
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            FloatingActionButton(onClick = { createForm = PackForm() }) {
+            FloatingActionButton(onClick = { createForm = PackForm(defaults = settings) }) {
                 Icon(Icons.Default.Add, contentDescription = "新建图标包")
             }
         },
@@ -188,6 +227,7 @@ fun PackListScreen(
                         status = state.statusOf(pack),
                         installLabel = state.installLabelOf(pack),
                         exporting = state.exportingPackId == pack.id,
+                        backing = state.backupBusyPackId == pack.id,
                         onClick = { onOpenPack(pack.id) },
                         onEdit = {
                             pendingEdit = pack
@@ -195,6 +235,7 @@ fun PackListScreen(
                         },
                         onDuplicate = { viewModel.duplicatePack(pack) },
                         onExport = { pendingExport = pack },
+                        onExportBackup = { pendingBackupExport = pack },
                         onDelete = { pendingDelete = pack },
                     )
                 }
@@ -251,6 +292,12 @@ fun PackListScreen(
                 if (form.toSignConfig() != pack.toSignConfig()) {
                     viewModel.setSigningConfig(pack, form.toSignConfig())
                 }
+                // SDK 重写 diff 写库（v8）：表单 null = 沿用模板，库里以 0 哨兵比较
+                val formMin = form.minSdkParsed ?: 0
+                val formTarget = form.targetSdkParsed ?: 0
+                if (formMin != pack.minSdkOverride || formTarget != pack.targetSdkOverride) {
+                    viewModel.setBuildSdk(pack, form.minSdkParsed, form.targetSdkParsed)
+                }
                 pendingEdit = null
                 pendingEditForm = null
             },
@@ -277,10 +324,23 @@ fun PackListScreen(
         )
     }
 
-    // 导出文件名建议（带版本号，便于多版本管理；磁盘最新产物即当前 versionCode）
+    // 导出文件名建议由全局模板折算（设置页可自定义占位符；占位符缺失时字段直接拼接）
     pendingExport?.let { pack ->
         LaunchedEffect(pack.id) {
-            exportLauncher.launch("IconPack-${pack.name}-v${pack.versionCode}.apk")
+            exportLauncher.launch(
+                IconFileStore.suggestedArtifactName(
+                    template = settings.artifactTemplate,
+                    packName = pack.name,
+                    versionName = pack.versionName,
+                    versionCode = pack.versionCode,
+                ),
+            )
+        }
+    }
+
+    pendingBackupExport?.let { pack ->
+        LaunchedEffect(pack.id) {
+            backupExportLauncher.launch("${pack.name}-备份.zip")
         }
     }
 }
@@ -294,10 +354,12 @@ private fun PackItem(
     status: PackStatus,
     installLabel: String,
     exporting: Boolean,
+    backing: Boolean,
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onDuplicate: () -> Unit,
     onExport: () -> Unit,
+    onExportBackup: () -> Unit,
     onDelete: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -345,7 +407,7 @@ private fun PackItem(
             IconButton(onClick = onEdit) {
                 Icon(Icons.Default.Edit, contentDescription = "编辑名称与图标")
             }
-            if (exporting) {
+            if (exporting || backing) {
                 CircularProgressIndicator(modifier = Modifier.padding(8.dp))
             } else {
                 IconButton(onClick = onExport, enabled = pack.lastPackedAt != null) {
@@ -363,6 +425,13 @@ private fun PackItem(
                         onClick = {
                             menuExpanded = false
                             onDuplicate()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("导出项目备份（ZIP）") },
+                        onClick = {
+                            menuExpanded = false
+                            onExportBackup()
                         },
                     )
                 }

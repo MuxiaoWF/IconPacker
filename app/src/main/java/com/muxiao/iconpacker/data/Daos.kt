@@ -118,6 +118,18 @@ interface PackDao {
     suspend fun countUsingKeystore(path: String): Int
 
     /**
+     * 设置产物 SDK 重写（v8）。
+     *
+     * 0 = 沿用模板值（与 [PackEntity.minSdkOverride]/[PackEntity.targetSdkOverride]
+     * 的哨兵语义一致）。校验（下限 24 / target≥min）由表单与仓库层完成，本方法只写。
+     */
+    @Query(
+        "UPDATE packs SET minSdkOverride = :minSdkOverride, " +
+            "targetSdkOverride = :targetSdkOverride, updatedAt = :now WHERE id = :packId",
+    )
+    suspend fun setBuildSdk(packId: Long, minSdkOverride: Int, targetSdkOverride: Int, now: Long)
+
+    /**
      * 除自己以外占用同一包名的项目。
      *
      * 两个项目同包名 = 两套产物在系统里争同一个位置，后装的会覆盖先装的，

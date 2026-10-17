@@ -15,6 +15,9 @@ data class SlotIcon(
     val sourcePath: String,
 )
 
+/** SDK 重写的下限：与模板 minSdk（template/build.gradle.kts defaultConfig）一致 */
+const val MIN_SDK_FLOOR = 24
+
 /** 一次打包请求（不可变输入，打包过程不修改） */
 data class PackRequest(
     /** 图标包名称（写入清单 label，即启动器里显示的名字） */
@@ -62,6 +65,19 @@ data class PackRequest(
      * 签名设置里按需开关（个别启动器/平台对某些方案组合有兼容癖好时）。
      */
     val signingSchemes: SigningSchemes = SigningSchemes(),
+    /**
+     * 产物 minSdk 重写（写入清单 `<uses-sdk android:minSdkVersion>`；null = 沿用模板值）。
+     * 设备上装不上 minSdk 过低的包（`INSTALL_FAILED_OLDER_SDK`），这里让用户抬高
+     * 项目的实际生效门槛；校验见 [createPack]/表单（minSdk ≥ 24，与模板一致）。
+     * 模板缺 `<uses-sdk>` 时降级保持模板原值（不阻断打包）。
+     */
+    val overrideMinSdk: Int? = null,
+    /**
+     * 产物 targetSdk 重写（写入清单 `<uses-sdk android:targetSdkVersion>`；null = 沿用模板值）。
+     * targetSdk 影响运行时行为开关（如 scoped storage），个别启动器生态对高 targetSdk
+     * 的图标包解析有兼容差异，用户可按需下调。不得小于 minSdk。
+     */
+    val overrideTargetSdk: Int? = null,
 ) {
     init {
         require(packName.isNotBlank()) { "图标包名称不能为空" }
@@ -71,6 +87,12 @@ data class PackRequest(
         require(icons.isNotEmpty()) { "至少需要一个图标" }
         require(signingSchemes.v1 || signingSchemes.v2 || signingSchemes.v3) {
             "至少需要启用一种签名方案"
+        }
+        require(overrideMinSdk == null || overrideMinSdk >= MIN_SDK_FLOOR) {
+            "minSdk 重写不得低于 $MIN_SDK_FLOOR（模板基线）"
+        }
+        require(overrideTargetSdk == null || overrideMinSdk == null || overrideTargetSdk >= overrideMinSdk) {
+            "targetSdk 重写不得低于 minSdk 重写"
         }
         PackageNameRules.requireValid(packageName)
         val slots = mappings.map { it.slot }.toSet()
@@ -98,6 +120,8 @@ data class PackRequest(
         if (!packIconBytes.contentEquals(other.packIconBytes)) return false
         if (packageName != other.packageName) return false
         if (signingSchemes != other.signingSchemes) return false
+        if (overrideMinSdk != other.overrideMinSdk) return false
+        if (overrideTargetSdk != other.overrideTargetSdk) return false
 
         return true
     }
@@ -115,6 +139,8 @@ data class PackRequest(
         result = 31 * result + (packIconBytes?.contentHashCode() ?: 0)
         result = 31 * result + packageName.hashCode()
         result = 31 * result + signingSchemes.hashCode()
+        result = 31 * result + overrideMinSdk.hashCode()
+        result = 31 * result + overrideTargetSdk.hashCode()
         return result
     }
 }

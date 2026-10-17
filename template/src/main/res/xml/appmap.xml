@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  appmap.xml 占位（CandyBar/Blueprint 生态的组件映射表，Atom Launcher 等启动器消费）。
+  打包时 [AppFilterFactory.buildAppMap] 生成的二进制 AXML 整体重写本条目字节；
+  引擎仅在模板实际包含该条目时替换（合成/第三方模板缺省时降级跳过）。
+  占位内容必须是合法的 <appmap> 根，由 aapt2 编译进 resources.arsc——
+  启动器通过 getIdentifier("appmap", "xml") 取完整路径，不是按文件名扫描 ZIP。
+-->
+<appmap />

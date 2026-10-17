@@ -65,6 +65,64 @@ object AppFilterFactory {
             },
         )
 
+    /**
+     * appmap.xml：CandyBar/Blueprint 生态的组件映射表（Atom Launcher 等启动器消费）。
+     *
+     * 格式自真实图标包模板核对（zixpo/candybar、jahirfiquitiva/Blueprint 的
+     * `app/src/main/res/xml/appmap.xml`）：
+     * ```
+     * <appmap>
+     *     <item class="com.example.app.MainActivity" name="drawable_name" />
+     * </appmap>
+     * ```
+     * 语义字段是**类名**而非 appfilter 那种 `ComponentInfo{}` 整串：`class` 是目标
+     * 活动的完整类名，`name` 是图标包内的资源名。注意生态里没有 componentmap.xml——
+     * Blueprint 官方 wiki 要求的映射组件只有 appmap（曾计划生成 componentmap，
+     * 经全生态核实后确认该文件不存在，见 docs/features.md）。
+     *
+     * 条目归一化：`ComponentInfo{pkg/.MainActivity}` 展开为 `pkg.MainActivity`，
+     * 相对类名以包名为前缀（这是 appfilter 允许的短写，启动器解析时同样展开）。
+     * 无法解析出包名/类名的条目直接丢弃——Atom launcher 对残缺条目不报错但不生效，
+     * 写进去不如不写。
+     */
+    fun buildAppMap(mappings: List<IconMapping>): AxmlElement =
+        AxmlElement(
+            name = "appmap",
+            children = mappings.mapNotNull { mapping ->
+                activityClassOf(mapping.component)?.let { klass ->
+                    AxmlElement(
+                        name = "item",
+                        attributes = listOf(
+                            AxmlAttr("class", AttrValue.Str(klass)),
+                            AxmlAttr("name", AttrValue.Str(slotName(mapping.slot))),
+                        ),
+                    )
+                }
+            },
+        )
+
+    /**
+     * 从 `ComponentInfo{包名/活动类}` 提取完整活动类名。
+     *
+     * appfilter 的 component 三种写法（各图标包写法不一，见 IconPackManifest）：
+     * `ComponentInfo{pkg/cls}` / `pkg/cls`（部分厂商省略前缀）/ `pkg/`（缺活动类）。
+     * 相对类名（`.cls`）按包名展开；仅给包名的条目没有类名可写，返回 null。
+     */
+    private fun activityClassOf(component: String): String? {
+        val inner = component.trim()
+            .trimStart('{')
+            .removePrefix(COMPONENT_INFO_PREFIX)
+            .trimStart('{')
+            .removeSuffix("}")
+            .trim()
+        val pkg = inner.substringBefore('/').trim()
+        val cls = inner.substringAfter('/', "").trim()
+        if (pkg.isEmpty() || cls.isEmpty()) return null
+        return if (cls.startsWith(".")) pkg + cls else cls
+    }
+
+    private const val COMPONENT_INFO_PREFIX = "ComponentInfo"
+
     /** 与模板模块 tools/gen_template_placeholders.py 的 SLOTS 保持一致 */
     const val MAX_SLOTS = 1024
 }

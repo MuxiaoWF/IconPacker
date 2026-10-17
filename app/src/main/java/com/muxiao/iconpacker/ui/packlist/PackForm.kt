@@ -22,11 +22,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.muxiao.iconpacker.core.packer.engine.MIN_SDK_FLOOR
 import com.muxiao.iconpacker.core.packer.engine.PackageNameRules
 import com.muxiao.iconpacker.core.packer.engine.TemplateInfo
+import com.muxiao.iconpacker.data.AppSettings
 import com.muxiao.iconpacker.data.PackEntity
 import com.muxiao.iconpacker.data.PackSignConfig
 import com.muxiao.iconpacker.domain.PackVersionRules
+
+/** SDK 输入区间的上层只防误填（如把年份写进去），无引擎语义 */
+private const val MAX_SDK = 99
 
 /**
  * 新建/编辑项目对话框共用的表单状态（FR-02 全字段 + v7 签名配置）。
@@ -37,11 +42,15 @@ import com.muxiao.iconpacker.domain.PackVersionRules
  * 字段改动只更新内存，保存时由各自的对话框一次性落库。
  */
 @Stable
-class PackForm(source: PackEntity? = null) {
+class PackForm(source: PackEntity? = null, defaults: AppSettings.State? = null) {
 
     var name by mutableStateOf(source?.name ?: "")
     var packageName by mutableStateOf(source?.packageName ?: "")
-    var versionName by mutableStateOf(source?.versionName ?: TemplateInfo.DEFAULT_VERSION_NAME)
+    var versionName by mutableStateOf(
+        source?.versionName
+            ?: defaults?.versionName?.takeIf { it.isNotBlank() }
+            ?: TemplateInfo.DEFAULT_VERSION_NAME,
+    )
 
     /** 版本号原始输入；新建留空 = 从 1 起自动递增，编辑预填"下次将使用的值" */
     var versionCodeInput by mutableStateOf(source?.upcomingVersionCode?.toString() ?: "")
@@ -55,10 +64,14 @@ class PackForm(source: PackEntity? = null) {
     var keystorePassword by mutableStateOf(source?.keystorePassword ?: "")
     var keystoreAlias by mutableStateOf(source?.keystoreAlias ?: "")
     var keyPassword by mutableStateOf(source?.keyPassword ?: "")
-    var signerName by mutableStateOf(source?.signerName ?: "")
-    var schemeV1 by mutableStateOf(source?.signSchemeV1 ?: true)
-    var schemeV2 by mutableStateOf(source?.signSchemeV2 ?: true)
-    var schemeV3 by mutableStateOf(source?.signSchemeV3 ?: true)
+    var signerName by mutableStateOf(source?.signerName ?: defaults?.signerName ?: "")
+    var schemeV1 by mutableStateOf(source?.signSchemeV1 ?: defaults?.schemeV1 ?: true)
+    var schemeV2 by mutableStateOf(source?.signSchemeV2 ?: defaults?.schemeV2 ?: true)
+    var schemeV3 by mutableStateOf(source?.signSchemeV3 ?: defaults?.schemeV3 ?: true)
+
+    /** 产物 SDK 重写原始输入；留空 = 沿用模板值（库里以 0 哨兵存储，v8） */
+    var minSdkInput by mutableStateOf(source?.minSdkOverride?.takeIf { it > 0 }?.toString() ?: "")
+    var targetSdkInput by mutableStateOf(source?.targetSdkOverride?.takeIf { it > 0 }?.toString() ?: "")
 
     val trimmedName: String get() = name.trim()
     val trimmedPackageName: String get() = packageName.trim()
@@ -87,12 +100,38 @@ class PackForm(source: PackEntity? = null) {
             else -> null
         }
 
+    /** minSdk 重写折算值；null = 未填（沿用模板），非数字由 [minSdkIssue] 报告 */
+    val minSdkParsed: Int? get() = minSdkInput.trim().takeIf { it.isNotEmpty() }?.toIntOrNull()
+
+    /** targetSdk 重写折算值；null = 未填（沿用模板） */
+    val targetSdkParsed: Int? get() = targetSdkInput.trim().takeIf { it.isNotEmpty() }?.toIntOrNull()
+
+    val minSdkIssue: String?
+        get() = when (val min = minSdkParsed) {
+            null -> null
+            !in MIN_SDK_FLOOR..MAX_SDK -> "minSdk 需在 $MIN_SDK_FLOOR～$MAX_SDK 之间"
+            else -> null
+        }
+
+    val targetSdkIssue: String?
+        get() {
+            val target = targetSdkParsed ?: return null
+            val min = minSdkParsed
+            return when {
+                target !in MIN_SDK_FLOOR..MAX_SDK -> "targetSdk 需在 $MIN_SDK_FLOOR～$MAX_SDK 之间"
+                min != null && target < min -> "targetSdk 不得低于 minSdk"
+                else -> null
+            }
+        }
+
     val isValid: Boolean
         get() = trimmedName.isNotEmpty() &&
             packageNameIssue == null &&
             versionNameIssue == null &&
             versionCodeIssue == null &&
-            signIssue == null
+            signIssue == null &&
+            minSdkIssue == null &&
+            targetSdkIssue == null
 
     fun toSignConfig(): PackSignConfig = PackSignConfig(
         signMode = if (importedKey) PackEntity.SIGN_MODE_IMPORTED else PackEntity.SIGN_MODE_DEVICE,
@@ -130,6 +169,9 @@ data class PackDraft(
     val showInDrawer: Boolean,
     val iconUri: Uri?,
     val sign: PackSignConfig,
+    /** 产物 SDK 重写；null = 未填（沿用模板值，落库为 0 哨兵） */
+    val minSdkOverride: Int?,
+    val targetSdkOverride: Int?,
 )
 
 fun PackForm.toDraft(): PackDraft = PackDraft(
@@ -140,6 +182,8 @@ fun PackForm.toDraft(): PackDraft = PackDraft(
     showInDrawer = showInDrawer,
     iconUri = iconUri,
     sign = toSignConfig(),
+    minSdkOverride = minSdkParsed,
+    targetSdkOverride = targetSdkParsed,
 )
 
 /**
@@ -207,6 +251,42 @@ fun PackFormFields(
                 )
             },
         )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "产物 SDK（可选，留空沿用模板）",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = form.minSdkInput,
+                onValueChange = { form.minSdkInput = it.filter(Char::isDigit).take(3) },
+                label = { Text("minSdk") },
+                singleLine = true,
+                isError = form.minSdkIssue != null,
+                supportingText = {
+                    val issue = form.minSdkIssue
+                    Text(
+                        text = issue ?: "留空沿用模板（$MIN_SDK_FLOOR）；抬高可拦掉装不上的老机型",
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                },
+            )
+            OutlinedTextField(
+                value = form.targetSdkInput,
+                onValueChange = { form.targetSdkInput = it.filter(Char::isDigit).take(3) },
+                label = { Text("targetSdk") },
+                singleLine = true,
+                isError = form.targetSdkIssue != null,
+                supportingText = {
+                    val issue = form.targetSdkIssue
+                    Text(
+                        text = issue ?: "留空沿用模板；一般不带 minSdk 单独抬高",
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                },
+            )
+        }
+
         Spacer(modifier = Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(

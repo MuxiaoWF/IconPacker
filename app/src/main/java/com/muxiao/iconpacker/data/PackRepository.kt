@@ -5,6 +5,7 @@ import com.muxiao.iconpacker.core.packer.engine.IconMapping
 import com.muxiao.iconpacker.core.packer.engine.IconPackManifest
 import com.muxiao.iconpacker.core.packer.engine.IconProcessor
 import com.muxiao.iconpacker.core.packer.engine.IconStyle
+import com.muxiao.iconpacker.core.packer.engine.MIN_SDK_FLOOR
 import com.muxiao.iconpacker.core.packer.engine.PackageNameRules
 import com.muxiao.iconpacker.core.packer.engine.PackProgress
 import com.muxiao.iconpacker.core.packer.engine.PackRequest
@@ -25,6 +26,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.io.File
+
+/** SDK 合理上限，防误填（如把年份写进去）；纯误填防护，无引擎语义 */
+private const val MAX_SDK_VALUE = 99
 
 /**
  * 图标包项目仓库：数据库 + 文件 + 打包引擎的唯一编排点。
@@ -77,12 +81,15 @@ class PackRepository(
         nextVersionCode: Int?,
         showInDrawer: Boolean,
         sign: PackSignConfig,
+        minSdkOverride: Int? = null,
+        targetSdkOverride: Int? = null,
     ): Long {
         val trimmedName = name.trim()
         val trimmedVersionName = versionName.trim()
         PackVersionRules.validateName(trimmedVersionName)?.let { throw IllegalArgumentException(it.message) }
         PackVersionRules.validateCode(nextVersionCode)?.let { throw IllegalArgumentException(it.message) }
         requireSignConfig(sign)
+        requireSdkOverrides(minSdkOverride, targetSdkOverride)
 
         val customPackage = packageName?.trim()?.takeIf { it.isNotEmpty() }
         customPackage?.let { pkg ->
@@ -111,6 +118,8 @@ class PackRepository(
                 signSchemeV1 = sign.schemeV1,
                 signSchemeV2 = sign.schemeV2,
                 signSchemeV3 = sign.schemeV3,
+                minSdkOverride = minSdkOverride ?: 0,
+                targetSdkOverride = targetSdkOverride ?: 0,
             ),
             now,
             customPackage,
@@ -232,7 +241,6 @@ class PackRepository(
             if (packDao.countUsingKeystore(path) == 0) fileStore.deleteKeystore(path)
         }
     }
-
     /**
      * 设置版本信息（FR-02 补充）。
      *
@@ -251,6 +259,38 @@ class PackRepository(
 
     /** 把用户经 SAF 选中的密钥库文件落地到私有目录（编辑/新建对话框共用），返回存储路径 */
     suspend fun importKeystoreFile(uri: Uri): String = fileStore.importKeystore(uri)
+
+    /**
+     * 设置产物 SDK 重写（v8）。
+     *
+     * @param minSdkOverride minSdk 重写值；null = 沿用模板值（落库为 0 哨兵）
+     * @param targetSdkOverride targetSdk 重写值；null = 沿用模板值
+     */
+    suspend fun setBuildSdk(packId: Long, minSdkOverride: Int?, targetSdkOverride: Int?) {
+        requireSdkOverrides(minSdkOverride, targetSdkOverride)
+        packDao.setBuildSdk(
+            packId = packId,
+            minSdkOverride = minSdkOverride ?: 0,
+            targetSdkOverride = targetSdkOverride ?: 0,
+            now = System.currentTimeMillis(),
+        )
+    }
+
+    /** 产物 SDK 重写入库前校验（0 哨兵在边界外，天然被拒绝为非法值） */
+    private fun requireSdkOverrides(minSdkOverride: Int?, targetSdkOverride: Int?) {
+        fun issue(min: Int?, target: Int?): String? {
+            val lo = min ?: MIN_SDK_FLOOR
+            return when {
+                min != null && min < MIN_SDK_FLOOR -> "minSdk 不能低于模板下限 $MIN_SDK_FLOOR"
+                target != null && target < lo ->
+                    if (min != null) "targetSdk 不能低于 minSdk" else "targetSdk 不能低于模板下限 $MIN_SDK_FLOOR"
+                target != null && target > MAX_SDK_VALUE -> "targetSdk 异常（>$MAX_SDK_VALUE）"
+                min != null && min > MAX_SDK_VALUE -> "minSdk 异常（>$MAX_SDK_VALUE）"
+                else -> null
+            }
+        }
+        issue(minSdkOverride, targetSdkOverride)?.let { throw IllegalArgumentException(it) }
+    }
 
     /**
      * 设置签名配置（v7）。
@@ -575,6 +615,9 @@ class PackRepository(
             // 签名身份逐项目装配（v7）：设备密钥可换签名者名；导入密钥按项目配置解析
             signingKeyProvider = signingProviderFor(pack),
             signingSchemes = SigningSchemes(pack.signSchemeV1, pack.signSchemeV2, pack.signSchemeV3),
+            // 产物 SDK 重写（v8）：0 是"沿用模板"哨兵，takeIf 归一化为 null 交给引擎
+            overrideMinSdk = pack.minSdkOverride.takeIf { it >= MIN_SDK_FLOOR },
+            overrideTargetSdk = pack.targetSdkOverride.takeIf { it >= MIN_SDK_FLOOR },
         )
     }
 

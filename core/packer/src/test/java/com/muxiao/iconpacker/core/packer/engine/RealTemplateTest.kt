@@ -651,6 +651,65 @@ class RealTemplateTest {
     }
 
     /**
+     * 模板必须登记 appmap.xml 资源（CandyBar/Blueprint 生态组件映射，Atom 消费）。
+     *
+     * 启动器靠 `getIdentifier("appmap", "xml")` 取完整路径——**文件不进 arsc 就不存在**。
+     * 产物断言是双层的：条目内容能读出映射条目（写进去了），且真实模板 templates
+     * 的 res/xml/appmap.xml 必须被替换为产物值而非占位（模板占位 `<appmap/>` 是空的，
+     * 一旦替换失效条目数为 0，测试即红）。
+     */
+    @Test
+    fun `appmap xml is registered by the template and rewritten in the output`() {
+        val template = loadTemplate()
+        assertTrue(
+            "模板未登记 res/xml/appmap.xml —— getIdentifier(\"appmap\",\"xml\") 会落空，" +
+                "appmap 对启动器等于不存在",
+            ZipUtils.hasEntry(template, "res/xml/appmap.xml"),
+        )
+
+        val out = PackAssembler.buildUnsigned(
+            template = template,
+            packName = "appmap 校验",
+            versionCode = 1,
+            mappings = listOf(IconMapping("ComponentInfo{com.a/.A}", 1)),
+            iconBytes = mapOf(1 to "WEBP-1".toByteArray()),
+        )
+
+        val appmap = AxmlReader(ZipUtils.readEntry(out, "res/xml/appmap.xml")!!)
+        assertEquals("appmap", appmap.root.name)
+        val item = appmap.root.children.single()
+        assertEquals("com.a.A", item.attributes.single { it.name == "class" }.rawValue)
+        assertEquals("ic_0001", item.attributes.single { it.name == "name" }.rawValue)
+        // 属性无命名空间：Atom 用 XmlPullParser 按属性名读，带 android: 前缀会读不到
+        item.attributes.forEach { attr -> assertEquals(null, attr.nsUri) }
+    }
+
+    /**
+     * 真实模板的 \<uses-sdk\> 被 SDK 重写原位改写。
+     * 真实模板由 aapt2 从 defaultConfig（minSdk=24/targetSdk=37）注入整数字面量，
+     * 引擎必须能在真实 AXML 布局上找到这两个属性并改写 data；假模板测不出
+     * "真实清单布局与自产清单不一致"这一类问题，故必须在此再走一遍。
+     */
+    @Test
+    fun `uses sdk overrides land on the real template manifest`() {
+        val out = PackAssembler.buildUnsigned(
+            template = loadTemplate(),
+            packName = "SDK 校验",
+            versionCode = 1,
+            mappings = listOf(IconMapping("ComponentInfo{com.a/.A}", 1)),
+            iconBytes = mapOf(1 to "WEBP-1".toByteArray()),
+            minSdkOverride = 26,
+            targetSdkOverride = 32,
+        )
+        val usesSdk = findElement(
+            AxmlReader(ZipUtils.readEntry(out, "AndroidManifest.xml")!!).root,
+            "uses-sdk",
+        ) ?: error("真实模板清单缺少 <uses-sdk>")
+        assertEquals(26, usesSdk.attributes.single { it.name == "minSdkVersion" }.data)
+        assertEquals(32, usesSdk.attributes.single { it.name == "targetSdkVersion" }.data)
+    }
+
+    /**
      * 逐 chunk 遍历（仅顶层），返回 (type, offset) 列表；[AxmlReader.readU16/readU32] 为伴随对象。
      */
     private fun walkChunks(bytes: ByteArray): List<Pair<Int, Int>> {

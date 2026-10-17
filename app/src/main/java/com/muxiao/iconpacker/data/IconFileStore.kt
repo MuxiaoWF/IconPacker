@@ -377,6 +377,37 @@ class IconFileStore(
         const val TEMPLATE_ASSET = "template.apk"
         private const val MAX_NAME_LEN = 64
 
+        /**
+         * 按全局模板折算导出建议文件名。
+         *
+         * 占位符：`{name}`=项目名、`{version}`=版本名、`{code}`=版本号。
+         * 空白折叠为单个连字符、非法字符替换为下划线，模板再花哨也不会发明出
+         * SAF 拒收的文件名；解析不出任何内容时兜底一个非空名（CreateDocument
+         * 的建议名不能为空）。
+         */
+        fun suggestedArtifactName(
+            template: String,
+            packName: String,
+            versionName: String,
+            versionCode: Int,
+        ): String {
+            val raw = template
+                .replace("{name}", packName.trim())
+                .replace("{version}", versionName.trim())
+                .replace("{code}", versionCode.toString())
+            val cleaned = raw
+                .map { ch -> if (ch in ILLEGAL_NAME_CHARS || ch.isWhitespace()) '_' else ch }
+                .joinToString("")
+                .replace(Regex("_{2,}"), "_")
+            return cleaned.takeLast(MAX_EXPORT_NAME_LEN).ifBlank { "IconPacker.apk" }
+        }
+
+        /** 需清洗的文件名字符集：SAF 文档名不允许出现路径分隔符等 */
+        private val ILLEGAL_NAME_CHARS = setOf('/', '\\', ':', '*', '?', '"', '<', '>', '|')
+
+        /** SAF 建议名的长度上限 */
+        private const val MAX_EXPORT_NAME_LEN = 96
+
         /** 待解包 ZIP 的暂存文件名 */
         private const val STAGED_ZIP_NAME = "staged-import.zip"
 

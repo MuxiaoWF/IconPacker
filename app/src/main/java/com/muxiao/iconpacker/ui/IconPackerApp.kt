@@ -10,12 +10,15 @@ import com.muxiao.iconpacker.ui.build.BuildScreen
 import com.muxiao.iconpacker.ui.editor.IconEditorScreen
 import com.muxiao.iconpacker.ui.mapping.MappingScreen
 import com.muxiao.iconpacker.ui.packlist.PackListScreen
+import com.muxiao.iconpacker.ui.settings.SettingsScreen
+import com.muxiao.iconpacker.ServiceLocator
 
 /**
  * 应用导航图（单 Activity + Navigation Compose）。
  *
  * 路由：
  * - home                    项目列表（FR-02）
+ * - settings                全局默认值设置
  * - mapping/{packId}        映射工作台 + 图标导入 + 图标库（FR-03 / FR-04）
  * - editor/{packId}/{slot}  单图标编辑（FR-05）
  * - build/{packId}          打包与安装引导（FR-06 / FR-07）
@@ -27,6 +30,13 @@ fun IconPackerApp() {
         composable("home") {
             PackListScreen(
                 onOpenPack = { packId -> navController.navigate("mapping/$packId") },
+                onOpenSettings = { navController.navigate("settings") },
+            )
+        }
+        composable("settings") {
+            SettingsScreen(
+                settings = ServiceLocator.settings,
+                onBack = { navController.popBackStack() },
             )
         }
         composable(

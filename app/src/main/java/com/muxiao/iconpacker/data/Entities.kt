@@ -43,7 +43,11 @@ import com.muxiao.iconpacker.domain.PackVersionRules
  * @param keyPassword 私钥密码；空 = 沿用 keystorePassword
  * @param signerName v1 签名者名（META-INF 下 .SF/.RSA 文件名）；空 = 各模式默认值
  * @param signSchemeV1/V2/V3 签名方案开关，默认全开（历史行为）
- */
+ * @param minSdkOverride 产物 minSdk 重写；**0 = 沿用模板值**（v8 哨兵，0 不可能是合法
+ *        SDK 值，下限为模板基线 `MIN_SDK_FLOOR`=24）。语义是"产物能装到多老的设备"，
+ *        抬高即可拦掉 INSTALL_FAILED_OLDER_SDK；写入 PackRequest 前用 takeIf 归一化
+ * @param targetSdkOverride 产物 targetSdk 重写；**0 = 沿用模板值**。不得低于
+ *        minSdkOverride（若两者都显式指定） */
 @Entity(tableName = "packs")
 data class PackEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -74,6 +78,10 @@ data class PackEntity(
     val signSchemeV2: Boolean = true,
     @ColumnInfo(defaultValue = "1")
     val signSchemeV3: Boolean = true,
+    @ColumnInfo(defaultValue = "0")
+    val minSdkOverride: Int = 0,
+    @ColumnInfo(defaultValue = "0")
+    val targetSdkOverride: Int = 0,
 ) {
     /**
      * 下次打包将使用的版本号：用户显式指定的优先，否则在最近版本上自动 +1。

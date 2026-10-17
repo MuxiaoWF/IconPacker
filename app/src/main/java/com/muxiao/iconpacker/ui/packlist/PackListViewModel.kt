@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.muxiao.iconpacker.ServiceLocator
+import com.muxiao.iconpacker.data.AppSettings
 import com.muxiao.iconpacker.data.InstalledPackChecker
 import com.muxiao.iconpacker.data.PackEntity
 import com.muxiao.iconpacker.data.PackRepository
@@ -34,6 +35,10 @@ data class PackListUiState(
      */
     val installedVersions: Map<String, Long> = emptyMap(),
     val exportingPackId: Long? = null,
+    /** 正在导出备份 ZIP 的项目 id（v8） */
+    val backupBusyPackId: Long? = null,
+    /** 备份导入进行中（v8）；完成后 createdPackId 被置位跳转映射工作台 */
+    val importingBackup: Boolean = false,
     val message: String? = null,
     /** 刚创建成功的项目 id（用于创建后直达编辑页，消费后置空） */
     val createdPackId: Long? = null,
@@ -59,9 +64,13 @@ enum class PackStatus { NEVER_PACKED, DIRTY, PACKED }
 class PackListViewModel(
     private val repository: PackRepository,
     private val installedPackChecker: InstalledPackChecker,
+    private val settings: AppSettings,
 ) : ViewModel() {
 
     private val packsFlow = repository.observePacks()
+
+    /** 全局默认值快照（设置页改完，这里新建表单/导出建议名即时跟随） */
+    val settingsState: StateFlow<AppSettings.State> = settings.state
 
     /**
      * 手动刷新信号。
@@ -73,6 +82,13 @@ class PackListViewModel(
     private val exportingFlow = MutableStateFlow<Long?>(null)
     private val messageFlow = MutableStateFlow<String?>(null)
     private val createdPackIdFlow = MutableStateFlow<Long?>(null)
+    private val backupBusyFlow = MutableStateFlow<Long?>(null)
+    private val importingBackupFlow = MutableStateFlow(false)
+
+    private val packExtrasFlow = combine(createdPackIdFlow, backupBusyFlow, importingBackupFlow) {
+            createdPackId, backupBusy, importing ->
+        Triple(createdPackId, backupBusy, importing)
+    }
 
     /** 逐项目查询安装状态；PackageManager 调用不能占主线程 */
     private val installedFlow: Flow<Map<String, Long>> =
@@ -90,15 +106,17 @@ class PackListViewModel(
         installedFlow,
         exportingFlow,
         messageFlow,
-        createdPackIdFlow,
-    ) { packs, installed, exporting, message, createdPackId ->
+        packExtrasFlow,
+    ) { packs, installed, exporting, message, extras ->
         PackListUiState(
             packs = packs,
             loading = false,
             installedVersions = installed,
             exportingPackId = exporting,
             message = message,
-            createdPackId = createdPackId,
+            createdPackId = extras.first,
+            backupBusyPackId = extras.second,
+            importingBackup = extras.third,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PackListUiState())
 
@@ -137,6 +155,8 @@ class PackListViewModel(
                     nextVersionCode = nextCode,
                     showInDrawer = draft.showInDrawer,
                     sign = draft.sign,
+                    minSdkOverride = draft.minSdkOverride,
+                    targetSdkOverride = draft.targetSdkOverride,
                 )
                 if (draft.iconUri != null) {
                     runCatching { repository.setPackIcon(id, draft.iconUri) }
@@ -209,6 +229,21 @@ class PackListViewModel(
         }
     }
 
+    /** 设置产物 SDK 重写（v8）：null = 沿用模板（仓库层折算成 0 哨兵落库） */
+    fun setBuildSdk(pack: PackEntity, minSdkOverride: Int?, targetSdkOverride: Int?) {
+        viewModelScope.launch {
+            val result = runCatching { repository.setBuildSdk(pack.id, minSdkOverride, targetSdkOverride) }
+            messageFlow.value = result.fold(
+                onSuccess = {
+                    val min = minSdkOverride?.let { "min $it" } ?: "min 沿用模板"
+                    val target = targetSdkOverride?.let { "target $it" } ?: "target 沿用模板"
+                    "产物 SDK 已更新（$min / $target）"
+                },
+                onFailure = { "SDK 设置失败：${it.message}" },
+            )
+        }
+    }
+
     /** 设置图标包自身的启动器图标（相册选图结果） */
     fun setPackIcon(pack: PackEntity, uri: Uri) {
         viewModelScope.launch {
@@ -277,6 +312,35 @@ class PackListViewModel(
         }
     }
 
+    /** 导出项目备份 ZIP（配置 + 图标池 + 映射；密钥库文件与密码不随包走） */
+    fun exportProjectBackup(pack: PackEntity, uri: Uri) {
+        viewModelScope.launch {
+            backupBusyFlow.value = pack.id
+            val result = runCatching { ServiceLocator.projectBackup.exportProject(pack.id, uri) }
+            backupBusyFlow.value = null
+            messageFlow.value = result.fold(
+                onSuccess = { "已导出项目备份（${it / 1024} KB），含图标与映射，不含密钥库" },
+                onFailure = { "备份导出失败：${it.message}" },
+            )
+        }
+    }
+
+    /** 导入项目备份 ZIP：返回新项目 id 后由界面跳转映射工作台 */
+    fun importProjectBackup(uri: Uri) {
+        viewModelScope.launch {
+            importingBackupFlow.value = true
+            val result = runCatching { ServiceLocator.projectBackup.importProject(uri) }
+            importingBackupFlow.value = false
+            result.fold(
+                onSuccess = { packId ->
+                    messageFlow.value = "项目已导入"
+                    createdPackIdFlow.value = packId
+                },
+                onFailure = { messageFlow.value = "备份导入失败：${it.message}" },
+            )
+        }
+    }
+
     /** 密钥库导入等后台转前台操作在场外失败时，把原因投递到界面 Snackbar */
     fun postMessage(text: String) {
         messageFlow.value = text
@@ -289,7 +353,11 @@ class PackListViewModel(
     companion object {
         fun factory(): ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                PackListViewModel(ServiceLocator.repository, ServiceLocator.installedPackChecker)
+                PackListViewModel(
+                    repository = ServiceLocator.repository,
+                    installedPackChecker = ServiceLocator.installedPackChecker,
+                    settings = ServiceLocator.settings,
+                )
             }
         }
     }

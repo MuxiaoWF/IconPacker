@@ -4,10 +4,12 @@ import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
 import com.muxiao.iconpacker.data.AppInfoProvider
+import com.muxiao.iconpacker.data.AppSettings
 import com.muxiao.iconpacker.data.IconFileStore
 import com.muxiao.iconpacker.data.IconPackerDatabase
 import com.muxiao.iconpacker.data.InstalledPackChecker
 import com.muxiao.iconpacker.data.PackRepository
+import com.muxiao.iconpacker.data.ProjectBackup
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,20 +33,33 @@ object ServiceLocator {
         private set
     lateinit var installedPackChecker: InstalledPackChecker
         private set
+    lateinit var settings: AppSettings
+        private set
+    lateinit var projectBackup: ProjectBackup
+        private set
 
     fun init(context: Context) {
         if (::repository.isInitialized) return
         // 只锁存 Application 上下文，杜绝把 Activity/View 等短生命周期上下文存进静态单例
         val appContext = context.applicationContext
         val db = IconPackerDatabase.build(appContext)
+        val fileStore = IconFileStore(appContext)
         repository = PackRepository(
             packDao = db.packDao(),
             mappingDao = db.mappingDao(),
             assetDao = db.iconAssetDao(),
-            fileStore = IconFileStore(appContext),
+            fileStore = fileStore,
             appInfoProvider = AppInfoProvider(appContext),
         )
         installedPackChecker = InstalledPackChecker(appContext)
+        settings = AppSettings(appContext)
+        projectBackup = ProjectBackup(
+            packDao = db.packDao(),
+            mappingDao = db.mappingDao(),
+            assetDao = db.iconAssetDao(),
+            fileStore = fileStore,
+            context = appContext,
+        )
     }
 }
 

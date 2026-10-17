@@ -16,7 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  */
 @Database(
     entities = [PackEntity::class, MappingEntity::class, IconAssetEntity::class],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 abstract class IconPackerDatabase : RoomDatabase() {
@@ -98,9 +98,25 @@ abstract class IconPackerDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v7 → v8：packs 增加 `minSdkOverride` / `targetSdkOverride`（产物 SDK 可重写）。
+         *
+         * 非空 INTEGER，**0 是"沿用模板值"的哨兵**（合法 SDK 值最低 24，0 不会歧义）。
+         * DEFAULT 0 让存量项目行为完全不变——打开库时未写值的行即"不重写"。
+         *
+         * DEFAULT 必须与 [PackEntity] 两列上的 `@ColumnInfo(defaultValue)` 逐字一致，
+         * 否则 Room 打开库时会判定"迁移未正确执行"并抛异常。
+         */
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE packs ADD COLUMN minSdkOverride INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE packs ADD COLUMN targetSdkOverride INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun build(context: Context): IconPackerDatabase =
             Room.databaseBuilder(context, IconPackerDatabase::class.java, "iconpacker.db")
-                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                 .fallbackToDestructiveMigration(false)
                 .build()
     }
