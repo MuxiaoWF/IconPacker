@@ -30,7 +30,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.core.packer.engine.IconShape
 import com.muxiao.iconpacker.core.packer.engine.IconStyle
 import com.muxiao.iconpacker.data.IconAssetEntity
@@ -40,6 +42,7 @@ import com.muxiao.iconpacker.ui.components.ColorSwatchRow
 import com.muxiao.iconpacker.ui.components.SectionHeader
 import com.muxiao.iconpacker.ui.components.ScrollableDialogContent
 import com.muxiao.iconpacker.ui.components.ToggleInfoRow
+import com.muxiao.iconpacker.ui.components.colorSwatchLabelRes
 import com.muxiao.iconpacker.ui.components.iconShapeLabel
 import com.muxiao.iconpacker.ui.theme.IconSize
 import com.muxiao.iconpacker.ui.theme.Spacing
@@ -80,7 +83,11 @@ fun IconLibraryTab(
                         .clickable { onIconClick(icon) },
                 )
                 Text(
-                    text = if (targets.isEmpty()) "未使用" else "供 ${targets.size} 个 App",
+                    text = if (targets.isEmpty()) {
+                        stringResource(R.string.mapping_unused_label)
+                    } else {
+                        stringResource(R.string.mapping_targets_count, targets.size)
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = when {
                         targets.isEmpty() -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -123,7 +130,11 @@ fun IconDetailDialog(
         text = {
             ScrollableDialogContent {
                 Text(
-                    text = if (targets.isEmpty()) "未分配给任何应用" else "供 ${targets.size} 个应用使用：",
+                    text = if (targets.isEmpty()) {
+                        stringResource(R.string.mapping_detail_no_targets)
+                    } else {
+                        stringResource(R.string.mapping_detail_header, targets.size)
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 targets.forEach { app ->
@@ -144,7 +155,10 @@ fun IconDetailDialog(
                                 text = if (app.installed) {
                                     app.packageName
                                 } else {
-                                    "${app.packageName} · 未安装，装上后自动生效"
+                                    stringResource(
+                                        R.string.mapping_target_pending_install,
+                                        app.packageName,
+                                    )
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -153,29 +167,33 @@ fun IconDetailDialog(
                         IconButton(onClick = { onEditTarget(app) }) {
                             Icon(
                                 imageVector = Icons.Default.Edit,
-                                contentDescription = "编辑映射的包名",
+                                contentDescription = stringResource(R.string.cd_edit_target),
                                 modifier = Modifier.size(18.dp),
                             )
                         }
                         IconButton(onClick = { onRemoveTarget(app) }) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
-                                contentDescription = "移除这条映射",
+                                contentDescription = stringResource(R.string.cd_remove_target),
                                 modifier = Modifier.size(18.dp),
                                 tint = MaterialTheme.colorScheme.error,
                             )
                         }
                     }
                 }
-                TextButton(onClick = onAddTarget) { Text("添加映射（指定包名）") }
+                TextButton(onClick = onAddTarget) {
+                    Text(stringResource(R.string.mapping_add_target_by_name))
+                }
             }
         },
-        confirmButton = { TextButton(onClick = onEdit) { Text("编辑图标") } },
+        confirmButton = {
+            TextButton(onClick = onEdit) { Text(stringResource(R.string.mapping_edit_icon)) }
+        },
         dismissButton = {
             TextButton(onClick = onDelete) {
-                Text("删除图标", color = MaterialTheme.colorScheme.error)
+                Text(stringResource(R.string.common_delete_icon), color = MaterialTheme.colorScheme.error)
             }
-            TextButton(onClick = onDismiss) { Text("关闭") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) }
         },
     )
 }
@@ -199,15 +217,15 @@ fun ShapeBatchDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("统一形状") },
+        title = { Text(stringResource(R.string.mapping_unify_shape)) },
         text = {
             ScrollableDialogContent(contentSpacing = Spacing.md) {
                 Text(
-                    text = "对全部图标从原图应用统一外形与背景色（将覆盖已有的单独编辑）。",
+                    text = stringResource(R.string.shape_batch_intro),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                SectionHeader("外形")
+                SectionHeader(stringResource(R.string.shape_batch_shape))
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -221,27 +239,27 @@ fun ShapeBatchDialog(
                         )
                     }
                 }
-                SectionHeader("背景色")
+                SectionHeader(stringResource(R.string.shape_batch_bg))
                 Text(
                     text = if (color == android.graphics.Color.TRANSPARENT) {
-                        "默认「无」——不添加任何背景，只保留图标本身"
+                        stringResource(R.string.shape_batch_bg_none)
                     } else {
-                        "将在内容四周填充该颜色"
+                        stringResource(R.string.shape_batch_bg_filled)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 ColorSwatchRow(
-                    entries = IconStyle.PRESET_COLORS.map { (preset, label) ->
-                        ColorSwatch(preset, label)
+                    entries = IconStyle.PRESET_COLORS.map { (preset, _) ->
+                        ColorSwatch(preset, stringResource(colorSwatchLabelRes(preset)))
                     },
                     selected = color,
                     onSelect = { color = it },
                 )
 
                 ToggleInfoRow(
-                    title = "同时覆盖已单独编辑的图标",
-                    subtitle = "默认跳过——避免冲掉你逐张调好的样式",
+                    title = stringResource(R.string.shape_batch_overwrite),
+                    subtitle = stringResource(R.string.shape_batch_overwrite_hint),
                     leading = {
                         Checkbox(checked = overwriteEdited, onCheckedChange = { overwriteEdited = it })
                     },
@@ -249,8 +267,12 @@ fun ShapeBatchDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onApply(shape, color, overwriteEdited) }) { Text("应用") }
+            TextButton(onClick = { onApply(shape, color, overwriteEdited) }) {
+                Text(stringResource(R.string.common_apply))
+            }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+        },
     )
 }

@@ -45,10 +45,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.data.AppSettings
 import com.muxiao.iconpacker.data.IconFileStore
 import com.muxiao.iconpacker.data.PackEntity
@@ -59,6 +61,8 @@ import com.muxiao.iconpacker.ui.sampleSizeFor
 import com.muxiao.iconpacker.ui.components.AppScaffold
 import com.muxiao.iconpacker.ui.components.EmptyState
 import com.muxiao.iconpacker.ui.components.ScrollableDialogContent
+import com.muxiao.iconpacker.ui.components.UiText
+import com.muxiao.iconpacker.ui.components.asString
 import com.muxiao.iconpacker.ui.theme.IconSize
 import com.muxiao.iconpacker.ui.theme.Spacing
 
@@ -77,6 +81,7 @@ fun PackListScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     // 新建：表单整体提升到 Screen（对话框只负责呈现与提交），启动器图标与
     // 密钥库文件的 SAF 结果要跨 Activity 生命周期回填表单，必须放在对话框外
@@ -114,7 +119,9 @@ fun PackListScreen(
             viewModel.importKeystoreFile(uri) { result ->
                 result.fold(
                     onSuccess = { form.applyKeystoreImport(it) },
-                    onFailure = { viewModel.postMessage("无法读取密钥库文件：${it.message}") },
+                    onFailure = {
+                        viewModel.postMessage(UiText(R.string.msg_keystore_read_failed, it.message.orEmpty()))
+                    },
                 )
             }
         }
@@ -127,7 +134,9 @@ fun PackListScreen(
             viewModel.importKeystoreFile(uri) { result ->
                 result.fold(
                     onSuccess = { form.applyKeystoreImport(it) },
-                    onFailure = { viewModel.postMessage("无法读取密钥库文件：${it.message}") },
+                    onFailure = {
+                        viewModel.postMessage(UiText(R.string.msg_keystore_read_failed, it.message.orEmpty()))
+                    },
                 )
             }
         }
@@ -162,7 +171,7 @@ fun PackListScreen(
 
     LaunchedEffect(state.message) {
         state.message?.let {
-            snackbarHostState.showSnackbar(it)
+            snackbarHostState.showSnackbar(it.asString(context))
             viewModel.consumeMessage()
         }
     }
@@ -176,7 +185,7 @@ fun PackListScreen(
     }
 
     AppScaffold(
-        title = "我的图标包",
+        title = stringResource(R.string.packlist_title),
         snackbarHostState = snackbarHostState,
         actions = {
             TextButton(
@@ -186,21 +195,28 @@ fun PackListScreen(
                     )
                 },
                 enabled = !state.importingBackup,
-            ) { Text(if (state.importingBackup) "导入中" else "导入") }
+            ) {
+                Text(
+                    text = if (state.importingBackup) {
+                        stringResource(R.string.packlist_importing)
+                    } else {
+                        stringResource(R.string.packlist_import)
+                    },
+                )
+            }
             IconButton(onClick = onOpenSettings) {
-                Icon(Icons.Default.Settings, contentDescription = "设置")
+                Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.cd_settings))
             }
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { createForm = PackForm(defaults = settings) }) {
-                Icon(Icons.Default.Add, contentDescription = "新建图标包")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.cd_create_pack))
             }
         },
     ) { innerPadding ->
         if (state.packs.isEmpty() && !state.loading) {
             EmptyState(
-                message = "还没有图标包。\n点击右下角按钮创建第一个，" +
-                    "然后导入图标、映射到应用、一键打包。",
+                message = stringResource(R.string.packlist_empty),
                 modifier = Modifier.padding(innerPadding),
             )
         } else {
@@ -296,18 +312,25 @@ fun PackListScreen(
     pendingDelete?.let { pack ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("删除图标包") },
-            text = { Text("将删除「${pack.name}」及其全部映射、图标与打包产物，且不可恢复。") },
+            title = { Text(stringResource(R.string.packlist_delete_title)) },
+            text = { Text(stringResource(R.string.packlist_delete_confirm, pack.name)) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         viewModel.deletePack(pack)
                         pendingDelete = null
                     },
-                ) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                ) {
+                    Text(
+                        stringResource(R.string.common_delete),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text("取消") }
+                TextButton(onClick = { pendingDelete = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
             },
         )
     }
@@ -327,9 +350,9 @@ fun PackListScreen(
     }
 
     pendingBackupExport?.let { pack ->
-        LaunchedEffect(pack.id) {
-            backupExportLauncher.launch("${pack.name}-备份.zip")
-        }
+            LaunchedEffect(pack.id) {
+                backupExportLauncher.launch(context.getString(R.string.packlist_backup_filename, pack.name))
+            }
     }
 }
 
@@ -343,7 +366,7 @@ fun PackListScreen(
 private fun PackItem(
     pack: PackEntity,
     status: PackStatus,
-    installLabel: String,
+    installLabel: UiText,
     exporting: Boolean,
     backing: Boolean,
     onClick: () -> Unit,
@@ -371,11 +394,16 @@ private fun PackItem(
                 )
                 // 版本名（用户可编辑）与版本号分开摆：前者给人看，后者决定能否覆盖安装
                 Text(
-                    text = "版本 ${pack.versionName}（v${pack.versionCode}）· " + when (status) {
-                        PackStatus.NEVER_PACKED -> "未打包"
-                        PackStatus.DIRTY -> "有未提交修改"
-                        PackStatus.PACKED -> "已打包"
-                    },
+                    text = stringResource(
+                        R.string.packlist_version_status,
+                        pack.versionName,
+                        pack.versionCode,
+                        when (status) {
+                            PackStatus.NEVER_PACKED -> stringResource(R.string.pack_status_never_packed)
+                            PackStatus.DIRTY -> stringResource(R.string.pack_status_dirty)
+                            PackStatus.PACKED -> stringResource(R.string.pack_status_packed)
+                        },
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = when (status) {
                         PackStatus.DIRTY -> MaterialTheme.colorScheme.error
@@ -387,13 +415,13 @@ private fun PackItem(
                 // 用户显式指定过下次版本号时如实预告，否则只能打包后才知道"这次打的到底是 v 几"
                 if (pack.nextVersionCode != null) {
                     Text(
-                        text = "下次打包 v${pack.upcomingVersionCode}（已指定）",
+                        text = stringResource(R.string.packlist_next_version, pack.upcomingVersionCode),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.tertiary,
                     )
                 }
                 Text(
-                    text = installLabel,
+                    text = installLabel.asString(),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -412,21 +440,21 @@ private fun PackItem(
             } else {
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "更多操作")
+                        Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.cd_more))
                     }
                     DropdownMenu(
                         expanded = menuExpanded,
                         onDismissRequest = { menuExpanded = false },
                     ) {
                         DropdownMenuItem(
-                            text = { Text("编辑名称与图标") },
+                            text = { Text(stringResource(R.string.menu_edit_pack)) },
                             onClick = {
                                 menuExpanded = false
                                 onEdit()
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("导出产物") },
+                            text = { Text(stringResource(R.string.menu_export_artifact)) },
                             onClick = {
                                 menuExpanded = false
                                 onExport()
@@ -434,21 +462,26 @@ private fun PackItem(
                             enabled = pack.lastPackedAt != null,
                         )
                         DropdownMenuItem(
-                            text = { Text("复制项目") },
+                            text = { Text(stringResource(R.string.menu_duplicate)) },
                             onClick = {
                                 menuExpanded = false
                                 onDuplicate()
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("导出项目备份（ZIP，不含密钥库）") },
+                            text = { Text(stringResource(R.string.menu_export_backup)) },
                             onClick = {
                                 menuExpanded = false
                                 onExportBackup()
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("删除", color = MaterialTheme.colorScheme.error) },
+                            text = {
+                                Text(
+                                    stringResource(R.string.common_delete),
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            },
                             onClick = {
                                 menuExpanded = false
                                 onDelete()
@@ -480,7 +513,7 @@ private fun EditPackDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("编辑图标包") },
+        title = { Text(stringResource(R.string.dialog_edit_pack_title)) },
         text = {
             ScrollableDialogContent {
                 PackFormFields(
@@ -496,9 +529,13 @@ private fun EditPackDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(form) }, enabled = form.isValid) { Text("保存") }
+            TextButton(onClick = { onSave(form) }, enabled = form.isValid) {
+                Text(stringResource(R.string.common_save))
+            }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+        },
     )
 }
 
@@ -541,13 +578,13 @@ private fun PackIconThumbnail(path: String? = null, uri: Uri? = null) {
     when {
         path != null -> IconImage(
             path = path,
-            contentDescription = "图标包图标",
+            contentDescription = stringResource(R.string.cd_pack_icon),
             modifier = Modifier.size(IconSize.thumb),
         )
 
         bitmap != null -> Image(
             bitmap = bitmap.asImageBitmap(),
-            contentDescription = "图标包图标",
+            contentDescription = stringResource(R.string.cd_pack_icon),
             modifier = Modifier.size(IconSize.thumb),
         )
 
@@ -561,7 +598,7 @@ private fun PackIconThumbnail(path: String? = null, uri: Uri? = null) {
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = "未设",
+                text = stringResource(R.string.pack_icon_unset),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -586,7 +623,7 @@ private fun CreatePackDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("新建图标包") },
+        title = { Text(stringResource(R.string.dialog_create_pack_title)) },
         text = {
             ScrollableDialogContent {
                 PackFormFields(
@@ -600,8 +637,12 @@ private fun CreatePackDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onCreate, enabled = form.isValid) { Text("创建") }
+            TextButton(onClick = onCreate, enabled = form.isValid) {
+                Text(stringResource(R.string.common_create))
+            }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+        },
     )
 }

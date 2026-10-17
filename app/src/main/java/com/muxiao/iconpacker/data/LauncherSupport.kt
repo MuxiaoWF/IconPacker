@@ -1,5 +1,8 @@
 package com.muxiao.iconpacker.data
 
+import androidx.annotation.StringRes
+import com.muxiao.iconpacker.R
+
 /**
  * 启动器兼容性知识库（纯 Kotlin，无 Android 依赖，可 JVM 单测）。
  *
@@ -30,7 +33,13 @@ object LauncherSupport {
     data class LauncherProfile(
         val displayName: String,
         val supportLevel: SupportLevel,
-        val guidance: String? = null,
+        /**
+         * 本地化展示名资源 id（优先于 [displayName] 展示）；
+         * 专有名词启动器名（Nova Launcher 等）不提供，直接用 [displayName]。
+         */
+        @StringRes val nameRes: Int? = null,
+        /** 引导文案资源 id（用户可见，随语言切换）；无引导文案为 null */
+        @StringRes val guidanceRes: Int? = null,
     )
 
     /** 本应用自身生成的图标包包名（探测时须排除，避免把产物当成启动器） */
@@ -47,7 +56,11 @@ object LauncherSupport {
         // ---- 第三方图标包启动器（标准协议）----
         "com.teslacoilsw.launcher" to LauncherProfile("Nova Launcher", SupportLevel.SUPPORTED),
         "app.lawnchair" to LauncherProfile("Lawnchair", SupportLevel.SUPPORTED),
-        "ch.deletescape.launcher" to LauncherProfile("Lawnchair（旧版）", SupportLevel.SUPPORTED),
+        "ch.deletescape.launcher" to LauncherProfile(
+            "Lawnchair",
+            SupportLevel.SUPPORTED,
+            nameRes = R.string.launcher_name_lawnchair_legacy,
+        ),
         "com.anddoes.launcher" to LauncherProfile("Apex Launcher", SupportLevel.SUPPORTED),
         "com.microsoft.launcher" to LauncherProfile("Microsoft Launcher", SupportLevel.SUPPORTED),
         "com.gau.go.launcherex" to LauncherProfile("GO Launcher EX", SupportLevel.SUPPORTED),
@@ -68,57 +81,63 @@ object LauncherSupport {
         "com.coloros.launcher" to LauncherProfile(
             "ColorOS 启动器",
             SupportLevel.LIMITED,
-            "ColorOS 的「图标」功能走 ART+/主题商店体系，暂不支持直接应用第三方图标包 APK" +
-                "（ColorOS 14 实测）。建议安装 Nova Launcher 或 Lawnchair 后启用本图标包。",
+            nameRes = R.string.launcher_name_coloros,
+            guidanceRes = R.string.launcher_guide_coloros,
         ),
         "com.oppo.launcher" to LauncherProfile(
             "OPPO 启动器",
             SupportLevel.LIMITED,
-            "OPPO 桌面与 ColorOS 同源，暂不支持直接应用第三方图标包 APK。建议安装 Nova Launcher 或 Lawnchair。",
+            nameRes = R.string.launcher_name_oppo,
+            guidanceRes = R.string.launcher_guide_oppo,
         ),
         // realme UI 默认不支持直接应用标准图标包（GeekChamp 实测）
         "com.realme.launcher" to LauncherProfile(
             "realme 启动器",
             SupportLevel.LIMITED,
-            "realme UI 默认不支持直接应用标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair 以获得完整图标包支持。",
+            nameRes = R.string.launcher_name_realme,
+            guidanceRes = R.string.launcher_guide_realme,
         ),
         // 通用 AOSP 包名（部分 ROM 以该包名提供系统桌面）。注意：**本机 OPPO PJU110 的
         // ColorOS 桌面正是 com.android.launcher**——LIMITED 文案必须与 ColorOS 实测一致。
         "com.android.launcher" to LauncherProfile(
             "系统启动器",
             SupportLevel.LIMITED,
-            "该启动器可能使用自有主题机制（OPPO ColorOS 14 实测不支持第三方图标包 APK）。" +
-                "建议安装 Nova Launcher 或 Lawnchair 以获得最佳兼容性。",
+            nameRes = R.string.launcher_name_system,
+            guidanceRes = R.string.launcher_guide_android,
         ),
         "com.sec.android.app.launcher" to LauncherProfile(
             "One UI Home",
             SupportLevel.LIMITED,
-            "One UI 使用 Galaxy Themes 主题机制，不直接应用标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair。",
+            guidanceRes = R.string.launcher_guide_oneui,
         ),
         "com.google.android.apps.nexuslauncher" to LauncherProfile(
             "Pixel Launcher",
             SupportLevel.LIMITED,
-            "Pixel Launcher 不支持标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair。",
+            guidanceRes = R.string.launcher_guide_pixel,
         ),
         "com.miui.home" to LauncherProfile(
             "MIUI / HyperOS 启动器",
             SupportLevel.LIMITED,
-            "小米启动器使用自有主题商店，不直接应用标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair。",
+            nameRes = R.string.launcher_name_miui,
+            guidanceRes = R.string.launcher_guide_miui,
         ),
         "com.huawei.android.launcher" to LauncherProfile(
             "华为启动器",
             SupportLevel.LIMITED,
-            "华为启动器使用自有主题机制，不直接应用标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair。",
+            nameRes = R.string.launcher_name_huawei,
+            guidanceRes = R.string.launcher_guide_huawei,
         ),
         "com.vivo.launcher" to LauncherProfile(
             "vivo 启动器",
             SupportLevel.LIMITED,
-            "vivo 启动器使用主题应用，不直接应用标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair。",
+            nameRes = R.string.launcher_name_vivo,
+            guidanceRes = R.string.launcher_guide_vivo,
         ),
         "com.meizu.flyme.launcher" to LauncherProfile(
             "魅族启动器",
             SupportLevel.LIMITED,
-            "魅族启动器使用自有主题机制，不直接应用标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair。",
+            nameRes = R.string.launcher_name_meizu,
+            guidanceRes = R.string.launcher_guide_meizu,
         ),
     )
 

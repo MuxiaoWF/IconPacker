@@ -1,5 +1,6 @@
 package com.muxiao.iconpacker.domain
 
+import com.muxiao.iconpacker.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -89,28 +90,26 @@ class MappingTargetTest {
     fun `uninstalled package without an activity is rejected instead of guessed`() {
         // 编一个 .MainActivity 出来只会在产物里留一条永远匹配不上的死条目
         val result = invalid("com.foo.bar", apps = emptyList())
-        assertTrue(
-            "提示里应说明白该怎么办，而不是只说「不行」：${result.message}",
-            result.message.contains("没有安装") && result.message.contains("/.MainActivity"),
-        )
+        assertEquals(R.string.err_mapping_target_not_installed, result.messageRes)
+        assertEquals(listOf("com.foo.bar"), result.args)
     }
 
     @Test
     fun `empty input is rejected`() {
-        assertEquals("请输入包名，或点「从应用列表选择」", invalid("   ").message)
+        assertEquals(R.string.err_mapping_target_empty, invalid("   ").messageRes)
     }
 
     @Test
     fun `illegal package name is rejected with the rule message`() {
-        assertTrue(invalid("com.foo-bar").message.contains("只能使用英文字母"))
-        assertTrue(invalid("com").message.contains("至少需要两段"))
+        assertEquals(R.string.err_pkg_invalid_chars, invalid("com.foo-bar").messageRes)
+        assertEquals(R.string.err_pkg_too_few_segments, invalid("com").messageRes)
     }
 
     @Test
     fun `illegal activity name is rejected`() {
-        assertTrue(
-            invalid("com.foo.bar/com.foo.1Bad", apps = emptyList())
-                .message.contains("活动类名不合法"),
+        assertEquals(
+            R.string.err_activity_invalid,
+            invalid("com.foo.bar/com.foo.1Bad", apps = emptyList()).messageRes,
         )
     }
 

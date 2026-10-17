@@ -1,5 +1,6 @@
 package com.muxiao.iconpacker.data
 
+import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.core.packer.engine.ApkBuilder
 import com.muxiao.iconpacker.core.packer.engine.IconMapping
 import com.muxiao.iconpacker.core.packer.engine.IconPackManifest
@@ -86,8 +87,8 @@ class PackRepository(
     ): Long {
         val trimmedName = name.trim()
         val trimmedVersionName = versionName.trim()
-        PackVersionRules.validateName(trimmedVersionName)?.let { throw IllegalArgumentException(it.message) }
-        PackVersionRules.validateCode(nextVersionCode)?.let { throw IllegalArgumentException(it.message) }
+        PackVersionRules.validateName(trimmedVersionName)?.let { throw LocalizedException(it.messageRes) }
+        PackVersionRules.validateCode(nextVersionCode)?.let { throw LocalizedException(it.messageRes) }
         requireSignConfig(sign)
         requireSdkOverrides(minSdkOverride, targetSdkOverride)
 
@@ -96,7 +97,7 @@ class PackRepository(
             PackageNameRules.requireValid(pkg)
             // 此时新项目尚未插库，排除 id 用 -1 即可拦截"与既有项目撞名"
             packDao.findOtherWithPackageName(pkg, -1L)?.let { other ->
-                throw IllegalArgumentException("包名已被项目「${other.name}」占用")
+                throw LocalizedException(R.string.err_package_taken, other.name)
             }
         }
 
@@ -144,7 +145,7 @@ class PackRepository(
      * 文件拷贝失败不静默：项目已落库但图标缺失时抛出，用户可删除后重试。
      */
     suspend fun duplicatePack(sourceId: Long): Long = withContext(Dispatchers.IO) {
-        val source = packDao.getById(sourceId) ?: error("项目不存在：$sourceId")
+        val source = packDao.getById(sourceId) ?: throw LocalizedException(R.string.err_pack_not_found, sourceId)
         val now = System.currentTimeMillis()
         val newId = packDao.insertWithPackage(
             source.copy(name = source.name + " 副本", createdAt = now, updatedAt = now, lastPackedAt = null),
@@ -162,7 +163,7 @@ class PackRepository(
                 id = 0,
                 packId = newId,
                 sourcePath = copyInto(File(asset.sourcePath), fileStore.iconsDir(newId), fileNameOf(asset.sourcePath))
-                    ?: error("复制原图失败：${asset.sourcePath}"),
+                    ?: throw LocalizedException(R.string.err_duplicate_source_copy, asset.sourcePath),
                 editedPath = asset.editedPath
                     ?.let { copyInto(File(it), fileStore.iconsDir(newId), fileNameOf(it)) },
             )
@@ -225,7 +226,7 @@ class PackRepository(
     suspend fun setPackageName(packId: Long, packageName: String) {
         PackageNameRules.requireValid(packageName)
         packDao.findOtherWithPackageName(packageName, packId)?.let { other ->
-            throw IllegalArgumentException("包名已被项目「${other.name}」占用")
+            throw LocalizedException(R.string.err_package_taken, other.name)
         }
         packDao.setPackageName(packId, packageName, System.currentTimeMillis())
     }
@@ -251,9 +252,9 @@ class PackRepository(
      */
     suspend fun setVersionInfo(packId: Long, versionName: String, nextVersionCode: Int?) {
         val name = versionName.trim()
-        PackVersionRules.validateName(name)?.let { throw IllegalArgumentException(it.message) }
+        PackVersionRules.validateName(name)?.let { throw LocalizedException(it.messageRes) }
         PackVersionRules.validateCode(nextVersionCode)
-            ?.let { throw IllegalArgumentException(it.message) }
+            ?.let { throw LocalizedException(it.messageRes) }
         packDao.setVersionInfo(packId, name, nextVersionCode, System.currentTimeMillis())
     }
 
@@ -278,18 +279,19 @@ class PackRepository(
 
     /** 产物 SDK 重写入库前校验（0 哨兵在边界外，天然被拒绝为非法值） */
     private fun requireSdkOverrides(minSdkOverride: Int?, targetSdkOverride: Int?) {
-        fun issue(min: Int?, target: Int?): String? {
-            val lo = min ?: MIN_SDK_FLOOR
-            return when {
-                min != null && min < MIN_SDK_FLOOR -> "minSdk 不能低于模板下限 $MIN_SDK_FLOOR"
-                target != null && target < lo ->
-                    if (min != null) "targetSdk 不能低于 minSdk" else "targetSdk 不能低于模板下限 $MIN_SDK_FLOOR"
-                target != null && target > MAX_SDK_VALUE -> "targetSdk 异常（>$MAX_SDK_VALUE）"
-                min != null && min > MAX_SDK_VALUE -> "minSdk 异常（>$MAX_SDK_VALUE）"
-                else -> null
-            }
+        val lo = minSdkOverride ?: MIN_SDK_FLOOR
+        when {
+            minSdkOverride != null && minSdkOverride < MIN_SDK_FLOOR ->
+                throw LocalizedException(R.string.err_min_sdk_below_floor, MIN_SDK_FLOOR)
+            targetSdkOverride != null && targetSdkOverride < lo && minSdkOverride != null ->
+                throw LocalizedException(R.string.err_target_below_min_sdk)
+            targetSdkOverride != null && targetSdkOverride < lo ->
+                throw LocalizedException(R.string.err_target_sdk_below_floor, MIN_SDK_FLOOR)
+            targetSdkOverride != null && targetSdkOverride > MAX_SDK_VALUE ->
+                throw LocalizedException(R.string.err_target_sdk_too_large, MAX_SDK_VALUE)
+            minSdkOverride != null && minSdkOverride > MAX_SDK_VALUE ->
+                throw LocalizedException(R.string.err_min_sdk_too_large, MAX_SDK_VALUE)
         }
-        issue(minSdkOverride, targetSdkOverride)?.let { throw IllegalArgumentException(it) }
     }
 
     /**
@@ -321,19 +323,19 @@ class PackRepository(
         }
     }
 
-    /** 保存前校验签名配置；失败原因文案直接面向用户 */
+    /** 保存前校验签名配置；失败原因以资源 id 抛出，UI 层按当前语言解析 */
     private fun requireSignConfig(config: PackSignConfig) {
         if (config.signMode == PackEntity.SIGN_MODE_IMPORTED) {
             if (config.keystorePath.isBlank()) {
-                throw IllegalArgumentException("已选择导入密钥库，但还没有选择密钥库文件")
+                throw LocalizedException(R.string.err_sign_config_no_file)
             }
             if (config.keystoreAlias.isBlank()) {
-                throw IllegalArgumentException("已选择导入密钥库，但还没有填写密钥别名")
+                throw LocalizedException(R.string.err_sign_config_no_alias)
             }
         }
         // 签名方案开关对两种模式一视同仁：全关等价于产出一个没法验签的包
         if (!(config.schemeV1 || config.schemeV2 || config.schemeV3)) {
-            throw IllegalArgumentException("至少需要保留一种签名方案")
+            throw LocalizedException(R.string.form_sign_needs_scheme)
         }
     }
 
@@ -581,16 +583,16 @@ class PackRepository(
      * 之后自动回到 +1（见 [PackEntity.nextVersionCode]）。
      */
     suspend fun prepareBuild(packId: Long): PackRequest {
-        val pack = packDao.getById(packId) ?: error("项目不存在：$packId")
+        val pack = packDao.getById(packId) ?: throw LocalizedException(R.string.err_pack_not_found, packId)
         // 打包前先校准：用户可能刚装上某个此前只有预置映射的应用，
         // 而映射页未必被打开过——那样打出来的包仍带着匹配不上的旧组件名。
         reconcileMappings(packId)
         val mappings = mappingDao.getByPack(packId)
-        require(mappings.isNotEmpty()) { "还没有任何映射，无法打包" }
+        if (mappings.isEmpty()) throw LocalizedException(R.string.err_no_mappings)
         val assets = assetDao.getByPack(packId)
         val slotsWithFiles = assets.map { it.slot }.toSet()
         mappings.firstOrNull { it.slot !in slotsWithFiles }?.let {
-            error("槽位 ${it.slot}（${it.component}）没有对应图标文件")
+            throw LocalizedException(R.string.err_mapping_no_icon, it.slot, it.component)
         }
 
         val versionCode = pack.upcomingVersionCode
@@ -631,8 +633,8 @@ class PackRepository(
     private fun signingProviderFor(pack: PackEntity): SigningKeyProvider = when (pack.signMode) {
         PackEntity.SIGN_MODE_IMPORTED -> {
             val path = pack.keystorePath
-            require(!path.isNullOrBlank()) { "已选择导入密钥库，但尚未选择密钥库文件；请在项目编辑里补全" }
-            require(!pack.keystoreAlias.isNullOrBlank()) { "已选择导入密钥库，但尚未填写密钥别名；请在项目编辑里补全" }
+            require(!path.isNullOrBlank()) { throw LocalizedException(R.string.err_sign_missing_file) }
+            require(!pack.keystoreAlias.isNullOrBlank()) { throw LocalizedException(R.string.err_sign_missing_alias) }
             ImportedKeystoreProvider(
                 keystorePath = path,
                 storePassword = pack.keystorePassword.orEmpty(),
@@ -666,7 +668,8 @@ class PackRepository(
 
     /** 编码并保存单张编辑产物（FR-05），返回新产物路径 */
     suspend fun saveIconEdit(packId: Long, slot: Int, style: IconStyle): String {
-        val icon = assetDao.get(packId, slot) ?: error("图标不存在：pack=$packId slot=$slot")
+        val icon = assetDao.get(packId, slot)
+            ?: throw LocalizedException(R.string.err_icon_missing, "$packId", slot)
         val bytes = withContext(Dispatchers.IO) { iconProcessor.encode(icon.sourcePath, style) }
         val path = fileStore.saveEditedIcon(packId, slot, bytes)
         assetDao.updateEdit(packId, slot, path)
@@ -722,7 +725,8 @@ class PackRepository(
 
     /** 导出最新产物到用户选定 Uri；返回写入字节数 */
     suspend fun exportLatestArtifact(packId: Long, target: Uri): Long {
-        val artifact = fileStore.latestArtifact(packId) ?: error("没有可导出的产物，请先打包")
+        val artifact = fileStore.latestArtifact(packId)
+            ?: throw LocalizedException(R.string.err_no_artifact)
         return fileStore.exportArtifact(artifact, target)
     }
 
@@ -864,7 +868,7 @@ class PackRepository(
         val result = ArrayList<Int>(count)
         var candidate = 1
         while (result.size < count) {
-            if (candidate > MAX_SLOTS) error("图标池已满（上限 $MAX_SLOTS 个）")
+            if (candidate > MAX_SLOTS) throw LocalizedException(R.string.err_icons_pool_full, MAX_SLOTS)
             if (candidate !in used) {
                 result.add(candidate)
                 used.add(candidate)

@@ -21,6 +21,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.core.packer.engine.MIN_SDK_FLOOR
 import com.muxiao.iconpacker.core.packer.engine.PackageNameRules
 import com.muxiao.iconpacker.core.packer.engine.TemplateInfo
@@ -28,8 +30,11 @@ import com.muxiao.iconpacker.data.AppSettings
 import com.muxiao.iconpacker.data.PackEntity
 import com.muxiao.iconpacker.data.PackSignConfig
 import com.muxiao.iconpacker.domain.PackVersionRules
+import com.muxiao.iconpacker.domain.messageRes
 import com.muxiao.iconpacker.ui.components.SectionHeader
 import com.muxiao.iconpacker.ui.components.ToggleInfoRow
+import com.muxiao.iconpacker.ui.components.UiText
+import com.muxiao.iconpacker.ui.components.asString
 import com.muxiao.iconpacker.ui.theme.Spacing
 
 /** SDK 输入区间的上层只防误填（如把年份写进去），无引擎语义 */
@@ -86,19 +91,20 @@ class PackForm(source: PackEntity? = null, defaults: AppSettings.State? = null) 
 
     val versionNameIssue: PackVersionRules.Issue? get() = PackVersionRules.validateName(trimmedVersionName)
 
-    val versionCodeIssue: String?
+    /** 校验结果以 UiText 承载（资源 id + 参数），文案由 UI 层按当前语言解析 */
+    val versionCodeIssue: UiText?
         get() = if (versionCodeParsed is PackVersionRules.Parsed.Invalid) {
-            PackVersionRules.Issue.CODE_NOT_POSITIVE.message
+            UiText(PackVersionRules.Issue.CODE_NOT_POSITIVE.messageRes)
         } else {
             null
         }
 
     /** 签名配置校验：编译进表单（而非等到仓库层），保存按钮可以直接联动禁用 */
-    val signIssue: String?
+    val signIssue: UiText?
         get() = when {
-            importedKey && keystorePath.isBlank() -> "导入密钥库需先选择密钥库文件"
-            importedKey && keystoreAlias.isBlank() -> "导入密钥库需填写密钥别名"
-            !(schemeV1 || schemeV2 || schemeV3) -> "至少保留一种签名方案"
+            importedKey && keystorePath.isBlank() -> UiText(R.string.form_sign_needs_file)
+            importedKey && keystoreAlias.isBlank() -> UiText(R.string.form_sign_needs_alias)
+            !(schemeV1 || schemeV2 || schemeV3) -> UiText(R.string.form_sign_needs_scheme)
             else -> null
         }
 
@@ -108,20 +114,21 @@ class PackForm(source: PackEntity? = null, defaults: AppSettings.State? = null) 
     /** targetSdk 重写折算值；null = 未填（沿用模板） */
     val targetSdkParsed: Int? get() = targetSdkInput.trim().takeIf { it.isNotEmpty() }?.toIntOrNull()
 
-    val minSdkIssue: String?
+    val minSdkIssue: UiText?
         get() = when (val min = minSdkParsed) {
             null -> null
-            !in MIN_SDK_FLOOR..MAX_SDK -> "minSdk 需在 $MIN_SDK_FLOOR～$MAX_SDK 之间"
+            !in MIN_SDK_FLOOR..MAX_SDK -> UiText(R.string.err_min_sdk_range, MIN_SDK_FLOOR, MAX_SDK)
             else -> null
         }
 
-    val targetSdkIssue: String?
+    val targetSdkIssue: UiText?
         get() {
             val target = targetSdkParsed ?: return null
             val min = minSdkParsed
             return when {
-                target !in MIN_SDK_FLOOR..MAX_SDK -> "targetSdk 需在 $MIN_SDK_FLOOR～$MAX_SDK 之间"
-                min != null && target < min -> "targetSdk 不得低于 minSdk"
+                target !in MIN_SDK_FLOOR..MAX_SDK ->
+                    UiText(R.string.err_target_sdk_range, MIN_SDK_FLOOR, MAX_SDK)
+                min != null && target < min -> UiText(R.string.err_target_below_min)
                 else -> null
             }
         }
@@ -216,20 +223,21 @@ fun PackFormFields(
         OutlinedTextField(
             value = form.name,
             onValueChange = { form.name = it },
-            label = { Text("图标包名称") },
+            label = { Text(stringResource(R.string.form_pack_name)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = form.versionName,
             onValueChange = { form.versionName = it },
-            label = { Text("版本名") },
+            label = { Text(stringResource(R.string.form_version_name)) },
             singleLine = true,
             isError = form.versionNameIssue != null,
             supportingText = {
                 Text(
-                    text = form.versionNameIssue?.message
-                        ?: "显示在系统的应用信息里；版本号与版本名是两件事",
+                    text = form.versionNameIssue?.messageRes
+                        ?.let { stringResource(it) }
+                        ?: stringResource(R.string.form_version_name_hint),
                     style = MaterialTheme.typography.labelSmall,
                 )
             },
@@ -243,21 +251,21 @@ fun PackFormFields(
         OutlinedTextField(
             value = form.packageName,
             onValueChange = { form.packageName = it },
-            label = { Text("包名（可选，留空自动生成）") },
+            label = { Text(stringResource(R.string.form_package_name_label)) },
             singleLine = true,
             isError = form.packageNameIssue != null,
             supportingText = {
                 Text(
-                    text = form.packageNameIssue?.message
-                        ?: ("每个图标包需要独立包名才能在系统里共存；改包名后要重新打包安装，" +
-                            "旧包名会作为独立应用留在设备上（可自行卸载）"),
+                    text = form.packageNameIssue?.messageRes()
+                        ?.let { stringResource(it) }
+                        ?: stringResource(R.string.form_package_name_hint),
                     style = MaterialTheme.typography.labelSmall,
                 )
             },
             modifier = Modifier.fillMaxWidth(),
         )
         Text(
-            text = "产物 SDK（可选，留空沿用模板）",
+            text = stringResource(R.string.form_sdk_section),
             style = MaterialTheme.typography.bodySmall,
         )
         Row(
@@ -273,7 +281,8 @@ fun PackFormFields(
                 supportingText = {
                     val issue = form.minSdkIssue
                     Text(
-                        text = issue ?: "留空沿用模板（$MIN_SDK_FLOOR）；抬高可拦掉装不上的老机型",
+                        text = issue?.asString()
+                            ?: stringResource(R.string.form_sdk_min_hint, MIN_SDK_FLOOR),
                         style = MaterialTheme.typography.labelSmall,
                     )
                 },
@@ -288,7 +297,8 @@ fun PackFormFields(
                 supportingText = {
                     val issue = form.targetSdkIssue
                     Text(
-                        text = issue ?: "留空沿用模板；一般不带 minSdk 单独抬高",
+                        text = issue?.asString()
+                            ?: stringResource(R.string.form_sdk_target_hint),
                         style = MaterialTheme.typography.labelSmall,
                     )
                 },
@@ -297,11 +307,11 @@ fun PackFormFields(
         }
 
         ToggleInfoRow(
-            title = "在应用抽屉显示",
+            title = stringResource(R.string.form_show_in_drawer),
             subtitle = if (form.showInDrawer) {
-                "抽屉里能看到这个图标包，点开是启用提示"
+                stringResource(R.string.form_show_in_drawer_on)
             } else {
-                "只作为主题资源，不占抽屉位置"
+                stringResource(R.string.form_show_in_drawer_off)
             },
             leading = {
                 Checkbox(
@@ -313,24 +323,32 @@ fun PackFormFields(
 
         if (iconContent != null) {
             Text(
-                text = "图标（在启动器里显示）" + if (onPickIcon == null) "，可选" else "",
+                text = if (onPickIcon == null) {
+                    stringResource(R.string.form_icon_section_optional)
+                } else {
+                    stringResource(R.string.form_icon_section)
+                },
                 style = MaterialTheme.typography.bodySmall,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 iconContent()
                 Spacer(modifier = Modifier.width(Spacing.md))
-                if (onPickIcon != null) TextButton(onClick = onPickIcon) { Text("选择图片") }
-                if (onClearIcon != null) TextButton(onClick = onClearIcon) { Text("清除") }
+                if (onPickIcon != null) {
+                    TextButton(onClick = onPickIcon) { Text(stringResource(R.string.form_pick_image)) }
+                }
+                if (onClearIcon != null) {
+                    TextButton(onClick = onClearIcon) { Text(stringResource(R.string.common_clear)) }
+                }
             }
         }
 
-        SectionHeader("签名设置")
+        SectionHeader(stringResource(R.string.form_sign_section))
         ToggleInfoRow(
-            title = "使用导入的密钥库",
+            title = stringResource(R.string.form_import_keystore),
             subtitle = if (form.importedKey) {
-                "用你自己的密钥签名，所有设备产出的图标包可用同一身份互相覆盖"
+                stringResource(R.string.form_import_keystore_on)
             } else {
-                "默认：密钥在本机 Keystore 生成，不可导出"
+                stringResource(R.string.form_import_keystore_off)
             },
             leading = {
                 Switch(checked = form.importedKey, onCheckedChange = { form.importedKey = it })
@@ -338,34 +356,34 @@ fun PackFormFields(
         )
         if (form.importedKey) {
             Text(
-                text = form.keystorePath.ifBlank { "尚未选择密钥库文件" },
+                text = form.keystorePath.ifBlank { stringResource(R.string.form_keystore_not_chosen) },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                TextButton(onClick = onPickKeystore) { Text("选择密钥库文件") }
+                TextButton(onClick = onPickKeystore) { Text(stringResource(R.string.form_pick_keystore)) }
                 if (form.keystorePath.isNotBlank()) {
-                    TextButton(onClick = onClearKeystore) { Text("清除") }
+                    TextButton(onClick = onClearKeystore) { Text(stringResource(R.string.common_clear)) }
                 }
             }
             OutlinedTextField(
                 value = form.keystorePassword,
                 onValueChange = { form.keystorePassword = it },
-                label = { Text("密钥库密码") },
+                label = { Text(stringResource(R.string.form_keystore_password)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = form.keystoreAlias,
                 onValueChange = { form.keystoreAlias = it },
-                label = { Text("密钥别名") },
+                label = { Text(stringResource(R.string.form_key_alias)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = form.keyPassword,
                 onValueChange = { form.keyPassword = it },
-                label = { Text("私钥密码（留空则与密钥库密码相同）") },
+                label = { Text(stringResource(R.string.form_key_password)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -373,17 +391,20 @@ fun PackFormFields(
         OutlinedTextField(
             value = form.signerName,
             onValueChange = { form.signerName = it },
-            label = { Text("签名者名（可选）") },
+            label = { Text(stringResource(R.string.form_signer_name)) },
             singleLine = true,
             supportingText = {
                 Text(
-                    text = "v1 签名条目的文件名；留空则用默认值",
+                    text = stringResource(R.string.form_signer_name_hint),
                     style = MaterialTheme.typography.labelSmall,
                 )
             },
             modifier = Modifier.fillMaxWidth(),
         )
-        Text(text = "签名方案", style = MaterialTheme.typography.bodySmall)
+        Text(
+            text = stringResource(R.string.form_schemes),
+            style = MaterialTheme.typography.bodySmall,
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             FilterChip(
                 selected = form.schemeV1,
@@ -404,7 +425,7 @@ fun PackFormFields(
         val signIssue = form.signIssue
         if (signIssue != null) {
             Text(
-                text = signIssue,
+                text = signIssue.asString(),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.error,
             )
@@ -424,29 +445,38 @@ private fun VersionCodeField(
     OutlinedTextField(
         value = form.versionCodeInput,
         onValueChange = { form.versionCodeInput = it.filter(Char::isDigit).take(10) },
-        label = { Text("下次打包版本号（留空自动 +1）") },
+        label = { Text(stringResource(R.string.form_version_code_label)) },
         singleLine = true,
         isError = form.versionCodeIssue != null,
         supportingText = {
             val issue = form.versionCodeIssue
             when {
                 issue != null -> Text(
-                    text = issue,
+                    text = issue.asString(),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
                 )
                 explicit != null && installedVersionCode != null && explicit <= installedVersionCode -> Text(
-                    text = "低于设备上已安装的 v$installedVersionCode，覆盖安装会被系统拒绝（需先卸载）",
+                    text = stringResource(
+                        R.string.form_version_code_warn_installed,
+                        installedVersionCode,
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
                 )
                 explicit != null && currentPackVersionCode != null && explicit <= currentPackVersionCode -> Text(
-                    text = "低于上次打包的 v$currentPackVersionCode，装回旧版本同样会被拒绝",
+                    text = stringResource(
+                        R.string.form_version_code_warn_last_pack,
+                        currentPackVersionCode,
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
                 )
                 else -> Text(
-                    text = "下次打包将使用 v${nextVersionPreview(form, currentPackVersionCode)}；清空则回到自动递增",
+                    text = stringResource(
+                        R.string.form_version_code_preview,
+                        nextVersionPreview(form, currentPackVersionCode),
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                 )
             }

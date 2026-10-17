@@ -30,13 +30,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.edit
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.data.LauncherCompat
 import com.muxiao.iconpacker.data.LauncherSupport
 import com.muxiao.iconpacker.ui.components.AppScaffold
 import com.muxiao.iconpacker.ui.components.StatusRow
+import com.muxiao.iconpacker.ui.components.asString
 import com.muxiao.iconpacker.ui.theme.IconSize
 import com.muxiao.iconpacker.ui.theme.Spacing
 
@@ -56,7 +59,7 @@ fun OnboardingScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    AppScaffold(title = "欢迎使用 IconPacker") { innerPadding ->
+    AppScaffold(title = stringResource(R.string.onboarding_title)) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -66,7 +69,7 @@ fun OnboardingScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
             Text(
-                text = "IconPacker 让你上传自有图标，一键打包成可安装的图标包 APK。",
+                text = stringResource(R.string.onboarding_intro),
                 style = MaterialTheme.typography.bodyLarge,
             )
 
@@ -76,13 +79,11 @@ fun OnboardingScreen(
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     Text(
-                        text = "使用前提：兼容的启动器",
+                        text = stringResource(R.string.onboarding_prereq_title),
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        text = "多数 OEM 系统启动器（Pixel Launcher、One UI Home、MIUI 等）" +
-                            "使用自有主题机制，不直接应用标准第三方图标包；最稳妥的方式是安装一个支持图标包的启动器" +
-                            "（如 Nova、Lawnchair、Apex），并在其图标样式设置里启用本应用生成的图标包。",
+                        text = stringResource(R.string.onboarding_prereq_body),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -115,23 +116,30 @@ fun OnboardingScreen(
                             },
                             text = when (state.currentSupportLevel) {
                                 LauncherSupport.SupportLevel.SUPPORTED ->
-                                    "当前启动器「${state.currentLauncherLabel}」支持图标包"
+                                    stringResource(
+                                        R.string.onboarding_status_supported,
+                                        state.currentLauncherLabel.orEmpty(),
+                                    )
                                 LauncherSupport.SupportLevel.LIMITED ->
-                                    "当前启动器「${state.currentLauncherLabel}」可能支持图标包" +
-                                        "（需在启动器设置中应用）"
+                                    stringResource(
+                                        R.string.onboarding_status_limited,
+                                        state.currentLauncherLabel.orEmpty(),
+                                    )
                                 else ->
                                     if (state.currentLauncherLabel == null) {
-                                        "未检测到默认启动器"
+                                        stringResource(R.string.onboarding_status_none)
                                     } else {
-                                        "未能确认「${state.currentLauncherLabel}」是否支持图标包，" +
-                                            "建议安装 Nova / Lawnchair"
+                                        stringResource(
+                                            R.string.onboarding_status_unknown,
+                                            state.currentLauncherLabel.orEmpty(),
+                                        )
                                     }
                             },
                         )
                     }
                     state.currentGuidance?.let { guidance ->
                         Text(
-                            text = guidance,
+                            text = guidance.asString(),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -141,7 +149,7 @@ fun OnboardingScreen(
 
             // 已检测到的启动器
             Text(
-                text = "已检测到 ${state.availableLaunchers.size} 个启动器",
+                text = stringResource(R.string.onboarding_detected_count, state.availableLaunchers.size),
                 style = MaterialTheme.typography.titleSmall,
             )
             state.availableLaunchers.forEach { launcher ->
@@ -159,17 +167,17 @@ fun OnboardingScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("设置默认启动器") }
+            ) { Text(stringResource(R.string.onboarding_set_default_launcher)) }
             OutlinedButton(
                 onClick = viewModel::refresh,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("重新检测") }
+            ) { Text(stringResource(R.string.onboarding_redetect)) }
             OutlinedButton(
                 onClick = onFinish,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("进入应用") }
+            ) { Text(stringResource(R.string.onboarding_enter_app)) }
             Text(
-                text = "暂不设置也能进入应用；之后随时可以在系统设置里更换默认启动器。",
+                text = stringResource(R.string.onboarding_skip_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -183,7 +191,7 @@ private fun CheckingRow() {
     Row(verticalAlignment = Alignment.CenterVertically) {
         CircularProgressIndicator(modifier = Modifier.size(IconSize.progressSmall))
         Spacer(modifier = Modifier.width(Spacing.sm))
-        Text("正在检测…", style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.onboarding_checking), style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -195,14 +203,22 @@ private fun LauncherListRow(launcher: LauncherCompat.LauncherInfo) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = launcher.label + if (launcher.isCurrent) "（当前）" else "",
+            text = (launcher.nameRes?.let { stringResource(it) } ?: launcher.label) +
+                if (launcher.isCurrent) {
+                    stringResource(R.string.launcher_current_suffix)
+                } else {
+                    ""
+                },
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f),
         )
         val badge = when (launcher.supportLevel) {
-            LauncherSupport.SupportLevel.SUPPORTED -> "支持图标包"
-            LauncherSupport.SupportLevel.LIMITED -> "需尝试"
-            LauncherSupport.SupportLevel.UNKNOWN -> "未知"
+            LauncherSupport.SupportLevel.SUPPORTED ->
+                stringResource(R.string.launcher_badge_supported)
+            LauncherSupport.SupportLevel.LIMITED ->
+                stringResource(R.string.launcher_badge_limited)
+            LauncherSupport.SupportLevel.UNKNOWN ->
+                stringResource(R.string.launcher_badge_unknown)
         }
         val color = when (launcher.supportLevel) {
             LauncherSupport.SupportLevel.SUPPORTED -> MaterialTheme.colorScheme.primary

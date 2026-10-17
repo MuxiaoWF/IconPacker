@@ -1,3 +1,370 @@
 <resources>
     <string name="app_name">IconPacker</string>
+
+    <!-- ===== 共享组件 ===== -->
+    <string name="cd_back">返回</string>
+    <string name="color_none">无</string>
+    <string name="color_paper_white">纸白</string>
+    <string name="color_ink_black">墨黑</string>
+    <string name="color_brand_blue">品牌蓝</string>
+    <string name="color_teal">青绿</string>
+    <string name="color_amber">琥珀</string>
+    <string name="color_vermilion">朱红</string>
+    <string name="color_white">白</string>
+    <string name="color_light_gray">浅灰</string>
+    <string name="shape_original">原图</string>
+    <string name="shape_circle">圆形</string>
+    <string name="shape_rounded">圆角</string>
+    <string name="shape_squircle">Squircle</string>
+
+    <!-- ===== 设置页 ===== -->
+    <string name="settings_title">设置</string>
+    <string name="settings_section_appearance">外观</string>
+    <string name="theme_mode_follow_system">跟随系统</string>
+    <string name="theme_mode_light">浅色</string>
+    <string name="theme_mode_dark">深色</string>
+    <string name="settings_theme_desc_follow">界面随系统的深/浅色设置自动切换</string>
+    <string name="settings_theme_desc_light">固定使用浅色界面</string>
+    <string name="settings_theme_desc_dark">固定使用深色界面</string>
+    <string name="settings_section_language">语言</string>
+    <string name="settings_language_system">跟随系统</string>
+    <string name="settings_language_desc">手动选择后应用界面将以该语言显示；跟随系统则随系统语言（含系统设置中的应用语言）自动切换。</string>
+    <string name="settings_section_defaults">新建项目默认值</string>
+    <string name="settings_default_version_name">默认版本名</string>
+    <string name="settings_default_version_name_hint">留空则用内置默认（1.0）</string>
+    <string name="settings_default_signer_name">默认签名者名</string>
+    <string name="settings_default_signer_name_hint">v1 签名条目使用的文件名；留空则用内置默认</string>
+    <string name="settings_default_schemes">默认签名方案</string>
+    <string name="settings_schemes_all_off">已全部关闭：新建设置保存时会被要求至少保留一种签名方案，「创建」按钮将处于禁用状态</string>
+    <string name="settings_section_artifact_template">导出产物文件名模板</string>
+    <string name="settings_artifact_template">文件名模板</string>
+    <string name="settings_artifact_template_hint">占位符：{name} 项目名 · {version} 版本名 · {code} 版本号</string>
+    <string name="settings_artifact_preview">预览：%1$s</string>
+    <string name="settings_artifact_preview_sample">我的主题</string>
+    <string name="settings_footer_note">说明：这些只是「新建时的预填值」，已建项目各自的配置不受影响。</string>
+
+    <!-- ===== 首次启动引导 ===== -->
+    <string name="onboarding_title">欢迎使用 IconPacker</string>
+    <string name="onboarding_intro">IconPacker 让你上传自有图标，一键打包成可安装的图标包 APK。</string>
+    <string name="onboarding_prereq_title">使用前提：兼容的启动器</string>
+    <string name="onboarding_prereq_body">多数 OEM 系统启动器（Pixel Launcher、One UI Home、MIUI 等）使用自有主题机制，不直接应用标准第三方图标包；最稳妥的方式是安装一个支持图标包的启动器（如 Nova、Lawnchair、Apex），并在其图标样式设置里启用本应用生成的图标包。</string>
+    <string name="onboarding_status_supported">当前启动器「%1$s」支持图标包</string>
+    <string name="onboarding_status_limited">当前启动器「%1$s」可能支持图标包（需在启动器设置中应用）</string>
+    <string name="onboarding_status_none">未检测到默认启动器</string>
+    <string name="onboarding_status_unknown">未能确认「%1$s」是否支持图标包，建议安装 Nova / Lawnchair</string>
+    <string name="onboarding_detected_count">已检测到 %1$d 个启动器</string>
+    <string name="onboarding_set_default_launcher">设置默认启动器</string>
+    <string name="onboarding_redetect">重新检测</string>
+    <string name="onboarding_enter_app">进入应用</string>
+    <string name="onboarding_skip_hint">暂不设置也能进入应用；之后随时可以在系统设置里更换默认启动器。</string>
+    <string name="onboarding_checking">正在检测…</string>
+    <string name="launcher_current_suffix">（当前）</string>
+    <string name="launcher_badge_supported">支持图标包</string>
+    <string name="launcher_badge_limited">需尝试</string>
+    <string name="launcher_badge_unknown">未知</string>
+    <string name="launcher_name_lawnchair_legacy">Lawnchair（旧版）</string>
+    <string name="launcher_name_coloros">ColorOS 启动器</string>
+    <string name="launcher_name_oppo">OPPO 启动器</string>
+    <string name="launcher_name_realme">realme 启动器</string>
+    <string name="launcher_name_system">系统启动器</string>
+    <string name="launcher_name_miui">MIUI / HyperOS 启动器</string>
+    <string name="launcher_name_huawei">华为启动器</string>
+    <string name="launcher_name_vivo">vivo 启动器</string>
+    <string name="launcher_name_meizu">魅族启动器</string>
+    <string name="launcher_guide_coloros">ColorOS 的「图标」功能走 ART+/主题商店体系，暂不支持直接应用第三方图标包 APK（ColorOS 14 实测）。建议安装 Nova Launcher 或 Lawnchair 后启用本图标包。</string>
+    <string name="launcher_guide_oppo">OPPO 桌面与 ColorOS 同源，暂不支持直接应用第三方图标包 APK。建议安装 Nova Launcher 或 Lawnchair。</string>
+    <string name="launcher_guide_realme">realme UI 默认不支持直接应用标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair 以获得完整图标包支持。</string>
+    <string name="launcher_guide_android">该启动器可能使用自有主题机制（OPPO ColorOS 14 实测不支持第三方图标包 APK）。建议安装 Nova Launcher 或 Lawnchair 以获得最佳兼容性。</string>
+    <string name="launcher_guide_oneui">One UI 使用 Galaxy Themes 主题机制，不直接应用标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair。</string>
+    <string name="launcher_guide_pixel">Pixel Launcher 不支持标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair。</string>
+    <string name="launcher_guide_miui">小米启动器使用自有主题商店，不直接应用标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair。</string>
+    <string name="launcher_guide_huawei">华为启动器使用自有主题机制，不直接应用标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair。</string>
+    <string name="launcher_guide_vivo">vivo 启动器使用主题应用，不直接应用标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair。</string>
+    <string name="launcher_guide_meizu">魅族启动器使用自有主题机制，不直接应用标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair。</string>
+
+    <!-- ===== 项目列表（FR-02/FR-08） ===== -->
+    <string name="packlist_title">我的图标包</string>
+    <string name="packlist_import">导入</string>
+    <string name="packlist_importing">导入中</string>
+    <string name="cd_settings">设置</string>
+    <string name="cd_create_pack">新建图标包</string>
+    <string name="packlist_empty">还没有图标包。\n点击右下角按钮创建第一个，然后导入图标、映射到应用、一键打包。</string>
+    <string name="packlist_backup_filename">%1$s-备份.zip</string>
+    <string name="packlist_delete_title">删除图标包</string>
+    <string name="packlist_delete_confirm">将删除「%1$s」及其全部映射、图标与打包产物，且不可恢复。</string>
+    <string name="packlist_version_status">版本 %1$s（v%2$d）· %3$s</string>
+    <string name="pack_status_never_packed">未打包</string>
+    <string name="pack_status_dirty">有未提交修改</string>
+    <string name="pack_status_packed">已打包</string>
+    <string name="packlist_next_version">下次打包 v%1$d（已指定）</string>
+    <string name="packlist_install_not_installed">未安装</string>
+    <string name="packlist_install_latest">已是最新</string>
+    <string name="packlist_install_update">可更新（已装 v%1$d → v%2$d）</string>
+    <string name="cd_more">更多操作</string>
+    <string name="cd_pack_icon">图标包图标</string>
+    <string name="pack_icon_unset">未设</string>
+    <string name="packlist_sdk_min_template">min 沿用模板</string>
+    <string name="packlist_sdk_target_template">target 沿用模板</string>
+
+    <!-- ===== 通用按钮/对话框 ===== -->
+    <string name="common_cancel">取消</string>
+    <string name="common_delete">删除</string>
+    <string name="common_save">保存</string>
+    <string name="common_create">创建</string>
+    <string name="common_confirm">确定</string>
+
+    <!-- ===== 通用菜单 ===== -->
+    <string name="menu_edit_pack">编辑名称与图标</string>
+    <string name="menu_export_artifact">导出产物</string>
+    <string name="menu_duplicate">复制项目</string>
+    <string name="menu_export_backup">导出项目备份（ZIP，不含密钥库）</string>
+
+    <!-- ===== 消息（项目列表 VM） ===== -->
+    <string name="msg_version_code_invalid">版本号必须是大于 0 的整数</string>
+    <string name="msg_keystore_read_failed">无法读取密钥库文件：%1$s</string>
+    <string name="msg_pack_created_icon_failed">已创建图标包，但图标设置失败：%1$s</string>
+    <string name="msg_create_failed">创建失败：%1$s</string>
+    <string name="msg_sign_config_updated">签名配置已更新</string>
+    <string name="msg_sign_config_invalid">签名配置不可用：%1$s</string>
+    <string name="msg_duplicated">已复制为「%1$s」</string>
+    <string name="msg_duplicate_failed">复制失败：%1$s</string>
+    <string name="msg_package_name_updated">包名已更新为 %1$s</string>
+    <string name="msg_package_name_invalid">包名不可用：%1$s</string>
+    <string name="msg_sdk_updated">产物 SDK 已更新（%1$s / %2$s）</string>
+    <string name="msg_sdk_update_failed">SDK 设置失败：%1$s</string>
+    <string name="msg_pack_icon_set">已设置图标包图标</string>
+    <string name="msg_pack_icon_failed">设置图标失败：%1$s</string>
+    <string name="msg_version_updated">版本已更新为 %1$s（下次打包 v%2$d）</string>
+    <string name="msg_version_update_failed">版本设置失败：%1$s</string>
+    <string name="msg_exported">已导出（%1$d KB）</string>
+    <string name="msg_export_failed">导出失败：%1$s</string>
+    <string name="msg_backup_exported">已导出项目备份（%1$d KB）</string>
+    <string name="msg_backup_export_failed">备份导出失败：%1$s</string>
+    <string name="msg_backup_imported">项目已导入；备份不含密钥库，打包将用本机新密钥签名（换设备后无法覆盖旧安装，需先卸载旧产物）</string>
+    <string name="msg_backup_import_failed">备份导入失败：%1$s</string>
+
+    <!-- ===== 项目表单（新建/编辑共用） ===== -->
+    <string name="form_pack_name">图标包名称</string>
+    <string name="form_version_name">版本名</string>
+    <string name="form_version_name_hint">显示在系统的应用信息里；版本号与版本名是两件事</string>
+    <string name="err_version_name_empty">版本名不能为空</string>
+    <string name="err_version_name_too_long">版本名最多 %1$d 个字符</string>
+    <string name="err_code_not_positive">版本号必须是大于 0 的整数</string>
+    <string name="err_code_too_large">版本号过大，最大 %1$d</string>
+    <string name="form_version_code_label">下次打包版本号（留空自动 +1）</string>
+    <string name="form_version_code_warn_installed">低于设备上已安装的 v%1$d，覆盖安装会被系统拒绝（需先卸载）</string>
+    <string name="form_version_code_warn_last_pack">低于上次打包的 v%1$d，装回旧版本同样会被拒绝</string>
+    <string name="form_version_code_preview">下次打包将使用 v%1$d；清空则回到自动递增</string>
+    <string name="form_package_name_label">包名（可选，留空自动生成）</string>
+    <string name="form_package_name_hint">每个图标包需要独立包名才能在系统里共存；改包名后要重新打包安装，旧包名会作为独立应用留在设备上（可自行卸载）</string>
+    <string name="form_sdk_section">产物 SDK（可选，留空沿用模板）</string>
+    <string name="form_sdk_min_hint">留空沿用模板（%1$d）；抬高可拦掉装不上的老机型</string>
+    <string name="form_sdk_target_hint">留空沿用模板；一般不带 minSdk 单独抬高</string>
+    <string name="err_min_sdk_range">minSdk 需在 %1$d～%2$d 之间</string>
+    <string name="err_target_sdk_range">targetSdk 需在 %1$d～%2$d 之间</string>
+    <string name="err_target_below_min">targetSdk 不得低于 minSdk</string>
+    <string name="form_show_in_drawer">在应用抽屉显示</string>
+    <string name="form_show_in_drawer_on">抽屉里能看到这个图标包，点开是启用提示</string>
+    <string name="form_show_in_drawer_off">只作为主题资源，不占抽屉位置</string>
+    <string name="form_icon_section">图标（在启动器里显示）</string>
+    <string name="form_icon_section_optional">图标（在启动器里显示），可选</string>
+    <string name="form_pick_image">选择图片</string>
+    <string name="common_clear">清除</string>
+    <string name="form_sign_section">签名设置</string>
+    <string name="form_import_keystore">使用导入的密钥库</string>
+    <string name="form_import_keystore_on">用你自己的密钥签名，所有设备产出的图标包可用同一身份互相覆盖</string>
+    <string name="form_import_keystore_off">默认：密钥在本机 Keystore 生成，不可导出</string>
+    <string name="form_keystore_not_chosen">尚未选择密钥库文件</string>
+    <string name="form_pick_keystore">选择密钥库文件</string>
+    <string name="form_keystore_password">密钥库密码</string>
+    <string name="form_key_alias">密钥别名</string>
+    <string name="form_key_password">私钥密码（留空则与密钥库密码相同）</string>
+    <string name="form_signer_name">签名者名（可选）</string>
+    <string name="form_signer_name_hint">v1 签名条目的文件名；留空则用默认值</string>
+    <string name="form_schemes">签名方案</string>
+    <string name="form_sign_needs_file">导入密钥库需先选择密钥库文件</string>
+    <string name="form_sign_needs_alias">导入密钥库需填写密钥别名</string>
+    <string name="form_sign_needs_scheme">至少保留一种签名方案</string>
+
+    <!-- ===== 包名校验（core PackageNameRules → app 层资源） ===== -->
+    <string name="err_pkg_empty">包名不能为空</string>
+    <string name="err_pkg_too_long">包名过长，最多 255 个字符</string>
+    <string name="err_pkg_too_few_segments">包名至少需要两段，例如 com.example.pack</string>
+    <string name="err_pkg_blank_segment">包名不能以点开头或结尾，也不能有连续的点</string>
+    <string name="err_pkg_segment_start">每一段必须以字母或下划线开头</string>
+    <string name="err_pkg_invalid_chars">只能使用英文字母、数字、下划线和点</string>
+    <string name="err_pkg_reserved">该包名已被系统或本应用占用，请换一个</string>
+
+    <string name="dialog_edit_pack_title">编辑图标包</string>
+    <string name="dialog_create_pack_title">新建图标包</string>
+
+    <!-- ===== 仓库层资源化异常（LocalizedException） ===== -->
+    <string name="err_package_taken">包名已被项目「%1$s」占用</string>
+    <string name="err_pack_not_found">项目不存在：%1$s</string>
+    <string name="err_duplicate_source_copy">复制原图失败：%1$s</string>
+    <string name="err_sign_config_no_file">已选择导入密钥库，但还没有选择密钥库文件</string>
+    <string name="err_sign_config_no_alias">已选择导入密钥库，但还没有填写密钥别名</string>
+    <string name="err_min_sdk_below_floor">minSdk 不能低于模板下限 %1$d</string>
+    <string name="err_target_below_min_sdk">targetSdk 不能低于 minSdk</string>
+    <string name="err_target_sdk_below_floor">targetSdk 不能低于模板下限 %1$d</string>
+    <string name="err_target_sdk_too_large">targetSdk 异常（>%1$d）</string>
+    <string name="err_min_sdk_too_large">minSdk 异常（>%1$d）</string>
+    <string name="err_no_mappings">还没有任何映射，无法打包</string>
+    <string name="err_mapping_no_icon">槽位 %1$d（%2$s）没有对应图标文件</string>
+    <string name="err_sign_missing_file">已选择导入密钥库，但尚未选择密钥库文件；请在项目编辑里补全</string>
+    <string name="err_sign_missing_alias">已选择导入密钥库，但尚未填写密钥别名；请在项目编辑里补全</string>
+    <string name="err_icon_missing">图标不存在：pack=%1$s slot=%2$d</string>
+    <string name="err_no_artifact">没有可导出的产物，请先打包</string>
+    <string name="err_icons_pool_full">图标池已满（上限 %1$d 个）</string>
+
+    <!-- ===== 映射工作台（FR-03/FR-04） ===== -->
+    <string name="mapping_title_fallback">映射工作台</string>
+    <string name="cd_auto_match">一键自动匹配</string>
+    <string name="mapping_import_album">相册导入</string>
+    <string name="mapping_import_zip">ZIP 导入</string>
+    <string name="mapping_progress">已映射 %1$d / %2$d · 图标 %3$d</string>
+    <string name="common_build">打包</string>
+    <string name="mapping_tab_apps">应用 %1$d</string>
+    <string name="mapping_tab_icons">图标 %1$d</string>
+    <string name="mapping_search_apps">搜索应用</string>
+    <string name="mapping_add_target">添加映射</string>
+    <string name="mapping_only_unmapped">只看未映射</string>
+    <string name="mapping_all_mapped_done">已安装应用全部映射完毕；给未安装的应用指图标可点「添加映射」</string>
+    <string name="mapping_icon_count">共 %1$d 个图标</string>
+    <string name="mapping_unify_shape">统一形状</string>
+    <string name="mapping_icons_empty">还没有图标。\n用上方「相册导入」逐张导入，\n或「ZIP 导入」整包导入图标包（自动建映射）。</string>
+    <string name="mapping_app_unmapped">未映射</string>
+    <string name="cd_edit_target">编辑映射的包名</string>
+    <string name="dialog_edit_target_title">编辑映射包名</string>
+    <string name="common_label_package_name">包名</string>
+    <string name="mapping_pick_from_apps">从应用列表选择</string>
+    <string name="mapping_resolve_target">将映射到 %1$s</string>
+    <string name="mapping_target_not_installed">该应用尚未安装：映射会先写进产物，装上后自动校准启动入口。</string>
+    <string name="mapping_retarget_warn">保存后这条映射改指向 %1$s，%2$s 不再有映射。</string>
+    <string name="mapping_next_step">下一步</string>
+    <string name="mapping_pick_app">选择应用</string>
+    <string name="common_search">搜索</string>
+    <string name="mapping_no_match">没有匹配的应用</string>
+    <string name="mapping_pick_icon_title">选择图标（%1$d）</string>
+    <string name="mapping_icons_pool_empty">图标池是空的，请先通过上方按钮导入图标。</string>
+    <string name="err_mapping_target_empty">请输入包名，或点「从应用列表选择」</string>
+    <string name="err_mapping_target_not_installed">本机没有安装 %1$s，无法确定它的启动入口。可以先安装该应用，或补全成组件形式（如 %1$s/.MainActivity）。</string>
+    <string name="err_activity_invalid">活动类名不合法，只能使用英文字母、数字、下划线和点</string>
+
+    <!-- ===== 图标库（图标反查视图 + 统一形状对话框） ===== -->
+    <string name="mapping_unused_label">未使用</string>
+    <string name="mapping_targets_count">供 %1$d 个 App</string>
+    <string name="mapping_detail_no_targets">未分配给任何应用</string>
+    <string name="mapping_detail_header">供 %1$d 个应用使用：</string>
+    <string name="mapping_target_pending_install">%1$s · 未安装，装上后自动生效</string>
+    <string name="cd_remove_target">移除这条映射</string>
+    <string name="mapping_add_target_by_name">添加映射（指定包名）</string>
+    <string name="mapping_edit_icon">编辑图标</string>
+    <string name="common_delete_icon">删除图标</string>
+    <string name="common_close">关闭</string>
+    <string name="common_apply">应用</string>
+    <string name="shape_batch_intro">对全部图标从原图应用统一外形与背景色（将覆盖已有的单独编辑）。</string>
+    <string name="shape_batch_shape">外形</string>
+    <string name="shape_batch_bg">背景色</string>
+    <string name="shape_batch_bg_none">默认「无」——不添加任何背景，只保留图标本身</string>
+    <string name="shape_batch_bg_filled">将在内容四周填充该颜色</string>
+    <string name="shape_batch_overwrite">同时覆盖已单独编辑的图标</string>
+    <string name="shape_batch_overwrite_hint">默认跳过——避免冲掉你逐张调好的样式</string>
+
+    <!-- ===== 映射工作台消息（MappingViewModel） ===== -->
+    <string name="mapping_msg_separator">；</string>
+    <string name="mapping_automap_sep">、</string>
+    <string name="msg_preset_activated">已为 %1$d 个新安装的应用启用预置图标</string>
+    <string name="msg_retarget_displaced">映射已改指向 %1$s（该目标原有的映射被替换）</string>
+    <string name="msg_retarget">映射已改指向 %1$s</string>
+    <string name="msg_reassign_icon">已将 %1$s 的映射改到这张图标上（它原有的映射已被替换）</string>
+    <string name="msg_automatch_added">自动匹配新增 %1$d 个映射</string>
+    <string name="msg_automatch_none">没有找到可自动匹配的应用</string>
+    <string name="msg_import_failed">导入失败：%1$s</string>
+    <string name="msg_shape_failed">统一形状失败：%1$s</string>
+    <string name="msg_batch_none_applied">没有可应用的图标（%1$d 个已单独编辑过）</string>
+    <string name="msg_batch_applied_skipped">已统一应用 %1$d 个图标，跳过 %2$d 个已单独编辑的</string>
+    <string name="msg_batch_applied">已统一应用 %1$d 个图标</string>
+
+    <!-- 导入结果分项 -->
+    <string name="msg_import_pool_full">图标池已满（上限 %1$d 个），未能导入</string>
+    <string name="msg_zip_no_images">ZIP 中未找到可用的图片文件</string>
+    <string name="msg_import_none">没有导入任何图标</string>
+    <string name="msg_imported_from_zip">已从 ZIP 导入 %1$d 个图标</string>
+    <string name="msg_imported">已导入 %1$d 个图标</string>
+    <string name="msg_automap_manifest">包内映射表 %1$d</string>
+    <string name="msg_automap_package">包名匹配 %1$d</string>
+    <string name="msg_automap_detail">自动建立 %1$d 个映射（%2$s）</string>
+    <string name="msg_automap_preset">另有 %1$d 个映射的目标应用未在本机安装，装上后自动生效</string>
+    <string name="msg_zip_no_appfilter">包内未发现 appfilter.xml，可按名称手动匹配</string>
+    <string name="msg_zip_no_auto_match">未自动匹配到应用，可点「一键自动匹配」按名称匹配</string>
+    <string name="msg_import_merged">合并 %1$d 个多密度副本</string>
+    <string name="msg_import_skipped">跳过 %1$d 个非图片文件</string>
+    <string name="msg_import_truncated">另有 %1$d 个超出槽位上限未导入</string>
+
+    <!-- ===== 图标编辑页（FR-05） ===== -->
+    <string name="editor_title">编辑图标</string>
+    <string name="editor_section_crop">裁剪</string>
+    <string name="editor_crop_hint">拖动移动取景框，双指缩放；框内区域即最终图标（正方形）。</string>
+    <string name="editor_zoom_label">缩放 %1$s×</string>
+    <string name="editor_crop_reset">重置裁剪</string>
+    <string name="editor_source_loading">源图加载中…</string>
+    <string name="editor_background_on">已开启：内容四周会填色</string>
+    <string name="editor_background_off">默认不加背景，只保留图标本身</string>
+    <string name="editor_border_title">边框</string>
+    <string name="editor_border_on">已开启：沿外形描边</string>
+    <string name="editor_border_off">默认不加边框</string>
+    <string name="editor_border_width">粗细 %1$d%%（占图标边长）</string>
+    <string name="editor_border_color">颜色</string>
+    <string name="editor_scale_label">内容缩放 %1$d%%</string>
+    <string name="editor_scale_fill">（铺满）</string>
+    <string name="editor_scale_hint">未开启背景/边框时缩小内容会留出透明边距。</string>
+    <string name="editor_overwrite_warn">当前图标已保存过编辑产物，再次保存将覆盖；还原可恢复原图。</string>
+    <string name="cd_editor_preview">图标预览</string>
+    <string name="editor_preview_failed">无法生成预览</string>
+    <string name="editor_restore">还原为原图</string>
+    <string name="editor_saving">保存中…</string>
+    <string name="editor_msg_missing">图标不存在或已删除</string>
+    <string name="editor_msg_saved">已保存</string>
+    <string name="editor_msg_save_failed">保存失败：%1$s</string>
+    <string name="editor_msg_reset">已还原为原图</string>
+
+    <!-- ===== 打包页（FR-06/07/08） ===== -->
+    <string name="build_title">打包图标包</string>
+    <string name="build_intro">共 %1$d 个应用映射。打包将生成符合 ADW/Nova 标准的图标包 APK，安装后在第三方启动器的图标样式里启用。</string>
+    <string name="build_icon_unset_title">尚未设置图标包自身的图标</string>
+    <string name="build_icon_unset_body">安装后，产物在桌面与应用抽屉里会显示模板自带的默认图标。可在项目列表的「图标包图标」入口里换成你想要的图。</string>
+    <string name="build_incomplete_title">有 %1$d 条映射的图标暂时无法被替换</string>
+    <string name="build_incomplete_body">这些映射的目标应用尚未安装，且只有包名没有活动类名——启动器解析不到就会整条跳过。把应用装上后打开映射页会自动校准；或在映射页手动补全为「包名/.活动类」形式。</string>
+    <string name="build_button_running">打包中…</string>
+    <string name="build_button_start">开始打包</string>
+    <string name="build_step_prepare">准备模板与签名身份</string>
+    <string name="build_step_manifest">写入应用信息</string>
+    <string name="build_step_axml">生成图标映射</string>
+    <string name="build_step_icons">处理图标</string>
+    <string name="build_step_zip">组装 APK</string>
+    <string name="build_step_sign">签名</string>
+    <string name="build_step_done">完成</string>
+    <string name="build_dv_title">安装前需要一次授权</string>
+    <string name="build_dv_body">本机启用了 Google 应用验证。图标包由你手机上的密钥签名，不属于已验证开发者，系统可能会阻止安装。在设置中完成一次「高级流程」即可继续安装，只需设置一次。</string>
+    <string name="build_dv_action">前往设置</string>
+    <string name="build_share_subject">分享图标包</string>
+    <string name="build_fail_title">打包失败（%1$s）</string>
+    <string name="common_back">返回</string>
+    <string name="build_enable_hint">启用方式：Nova → 设置 → 外观 → 图标样式 → 图标主题；Lawnchair → 主页设置 → 常规 → 图标样式；Apex → 设置 → 主题 → 图标包。</string>
+    <string name="build_success_title">打包完成</string>
+    <string name="build_size_signer">大小 %1$s · 签名者 %2$s</string>
+    <string name="build_version_line">版本 %1$s（v%2$d）</string>
+    <string name="build_sdk_rewrite_note"> · SDK 重写：%1$s</string>
+    <string name="common_install">安装</string>
+    <string name="build_share">分享</string>
+    <string name="build_export">导出</string>
+    <string name="build_open_launcher">打开启动器</string>
+    <string name="msg_build_incomplete">注意：%1$d 条映射的目标应用未安装且缺少活动类名，这些图标不会被桌面替换（详见页内提示卡）。</string>
+    <string name="msg_build_settings_open_failed">无法打开设置</string>
+    <string name="msg_build_install_intent_failed">无法调起安装器：%1$s</string>
+    <string name="msg_build_unknown_sources_manual">请手动前往设置授予安装未知应用权限</string>
+    <string name="msg_build_share_failed">分享失败：%1$s</string>
+    <string name="msg_build_open_launcher_failed">无法打开启动器</string>
+    <string name="msg_build_no_launcher">未找到第三方启动器</string>
 </resources>

@@ -42,8 +42,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.ui.theme.IconSize
 import com.muxiao.iconpacker.ui.theme.Spacing
 
@@ -75,7 +77,7 @@ fun AppScaffold(
                         IconButton(onClick = onBack) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "返回",
+                                contentDescription = stringResource(R.string.cd_back),
                             )
                         }
                     }
@@ -161,6 +163,23 @@ fun NoticeCard(
 data class ColorSwatch(val color: Int, val label: String = "")
 
 /**
+ * core 色板色值 → 本地化色名资源 id（core 侧的中文色名仅作内部标识；
+ * 色值是稳定的引擎常量，按值映射即可与 core 精确对齐）。返回 0 表示无对应映射。
+ */
+fun colorSwatchLabelRes(color: Int): Int = when (color) {
+    android.graphics.Color.TRANSPARENT -> R.string.color_none
+    0xFFF5F7FA.toInt() -> R.string.color_paper_white
+    0xFF212121.toInt() -> R.string.color_ink_black
+    0xFF1565C0.toInt() -> R.string.color_brand_blue
+    0xFF00897B.toInt() -> R.string.color_teal
+    0xFFF9A825.toInt() -> R.string.color_amber
+    0xFFE53935.toInt() -> R.string.color_vermilion
+    android.graphics.Color.WHITE -> R.string.color_white
+    0xFFBDBDBD.toInt() -> R.string.color_light_gray
+    else -> 0
+}
+
+/**
  * 色板行：编辑器背景/边框色与"统一形状"对话框共用同一实现。
  * [entries] 中 [ColorSwatch.color] 为 android.graphics.Color 值（与引擎常量同源）。
  */
@@ -197,7 +216,7 @@ fun ColorSwatchRow(
             ) {
                 if (transparent) {
                     Text(
-                        text = swatch.label.ifEmpty { "无" },
+                        text = swatch.label.ifEmpty { stringResource(R.string.color_none) },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

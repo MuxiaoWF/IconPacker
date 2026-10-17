@@ -1,5 +1,6 @@
 package com.muxiao.iconpacker.ui.settings
 
+import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,9 +18,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.data.AppSettings
 import com.muxiao.iconpacker.data.IconFileStore
+import com.muxiao.iconpacker.data.LocaleMode
 import com.muxiao.iconpacker.data.ThemeMode
 import com.muxiao.iconpacker.ui.components.AppScaffold
 import com.muxiao.iconpacker.ui.components.SectionHeader
@@ -30,6 +35,9 @@ import com.muxiao.iconpacker.ui.theme.Spacing
  *
  * 定位："新建项目时预填什么"的口径，不属于任何项目（对比项目编辑对话框）。
  * 写即生效（SharedPreferences），返回列表页后新建表单与导出建议名即时跟随。
+ *
+ * 语言卡：切换 [LocaleMode] 后重建 Activity，attachBaseContext 重新包裹生效；
+ * 中文/English 两项以各自语言自名（不随界面语言翻译）。
  */
 @Composable
 fun SettingsScreen(
@@ -37,8 +45,9 @@ fun SettingsScreen(
     onBack: () -> Unit,
 ) {
     val state by settings.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
-    AppScaffold(title = "设置", onBack = onBack) { innerPadding ->
+    AppScaffold(title = stringResource(R.string.settings_title), onBack = onBack) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -52,22 +61,36 @@ fun SettingsScreen(
                     modifier = Modifier.padding(Spacing.lg),
                     verticalArrangement = Arrangement.spacedBy(Spacing.md),
                 ) {
-                    SectionHeader("外观")
+                    SectionHeader(stringResource(R.string.settings_section_appearance))
                     // 立即生效：AppRoot 收集状态即时换肤
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                         ThemeMode.entries.forEach { mode ->
                             FilterChip(
                                 selected = state.themeMode == mode,
                                 onClick = { settings.setThemeMode(mode) },
-                                label = { Text(mode.label) },
+                                label = {
+                                    Text(
+                                        text = when (mode) {
+                                            ThemeMode.FollowSystem ->
+                                                stringResource(R.string.theme_mode_follow_system)
+                                            ThemeMode.Light ->
+                                                stringResource(R.string.theme_mode_light)
+                                            ThemeMode.Dark ->
+                                                stringResource(R.string.theme_mode_dark)
+                                        },
+                                    )
+                                },
                             )
                         }
                     }
                     Text(
                         text = when (state.themeMode) {
-                            ThemeMode.FollowSystem -> "界面随系统的深/浅色设置自动切换"
-                            ThemeMode.Light -> "固定使用浅色界面"
-                            ThemeMode.Dark -> "固定使用深色界面"
+                            ThemeMode.FollowSystem ->
+                                stringResource(R.string.settings_theme_desc_follow)
+                            ThemeMode.Light ->
+                                stringResource(R.string.settings_theme_desc_light)
+                            ThemeMode.Dark ->
+                                stringResource(R.string.settings_theme_desc_dark)
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -80,24 +103,62 @@ fun SettingsScreen(
                     modifier = Modifier.padding(Spacing.lg),
                     verticalArrangement = Arrangement.spacedBy(Spacing.md),
                 ) {
-                    SectionHeader("新建项目默认值")
+                    SectionHeader(stringResource(R.string.settings_section_language))
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        FilterChip(
+                            selected = state.localeMode == LocaleMode.FollowSystem,
+                            onClick = { switchLocale(settings, context, LocaleMode.FollowSystem) },
+                            label = { Text(stringResource(R.string.settings_language_system)) },
+                        )
+                        FilterChip(
+                            selected = state.localeMode == LocaleMode.Chinese,
+                            onClick = { switchLocale(settings, context, LocaleMode.Chinese) },
+                            label = { Text("中文") },
+                        )
+                        FilterChip(
+                            selected = state.localeMode == LocaleMode.English,
+                            onClick = { switchLocale(settings, context, LocaleMode.English) },
+                            label = { Text("English") },
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.settings_language_desc),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Card {
+                Column(
+                    modifier = Modifier.padding(Spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                ) {
+                    SectionHeader(stringResource(R.string.settings_section_defaults))
                     OutlinedTextField(
                         value = state.versionName,
                         onValueChange = settings::setVersionName,
-                        label = { Text("默认版本名") },
+                        label = { Text(stringResource(R.string.settings_default_version_name)) },
                         singleLine = true,
-                        supportingText = { Text("留空则用内置默认（1.0）") },
+                        supportingText = {
+                            Text(stringResource(R.string.settings_default_version_name_hint))
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
                         value = state.signerName,
                         onValueChange = settings::setSignerName,
-                        label = { Text("默认签名者名") },
+                        label = { Text(stringResource(R.string.settings_default_signer_name)) },
                         singleLine = true,
-                        supportingText = { Text("v1 签名条目使用的文件名；留空则用内置默认") },
+                        supportingText = {
+                            Text(stringResource(R.string.settings_default_signer_name_hint))
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Text(text = "默认签名方案", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        text = stringResource(R.string.settings_default_schemes),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                         FilterChip(
                             selected = state.schemeV1,
@@ -117,8 +178,7 @@ fun SettingsScreen(
                     }
                     if (!(state.schemeV1 || state.schemeV2 || state.schemeV3)) {
                         Text(
-                            text = "已全部关闭：新建设置保存时会被要求至少保留一种签名方案，" +
-                                "「创建」按钮将处于禁用状态",
+                            text = stringResource(R.string.settings_schemes_all_off),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -131,19 +191,27 @@ fun SettingsScreen(
                     modifier = Modifier.padding(Spacing.lg),
                     verticalArrangement = Arrangement.spacedBy(Spacing.md),
                 ) {
-                    SectionHeader("导出产物文件名模板")
+                    SectionHeader(stringResource(R.string.settings_section_artifact_template))
                     OutlinedTextField(
                         value = state.artifactTemplate,
                         onValueChange = settings::setArtifactTemplate,
-                        label = { Text("文件名模板") },
+                        label = { Text(stringResource(R.string.settings_artifact_template)) },
                         singleLine = true,
                         supportingText = {
-                            Text("占位符：{name} 项目名 · {version} 版本名 · {code} 版本号")
+                            Text(stringResource(R.string.settings_artifact_template_hint))
                         },
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Text(
-                        text = "预览：${IconFileStore.suggestedArtifactName(state.artifactTemplate, "我的主题", "1.2.3", 7)}",
+                        text = stringResource(
+                            R.string.settings_artifact_preview,
+                            IconFileStore.suggestedArtifactName(
+                                state.artifactTemplate,
+                                stringResource(R.string.settings_artifact_preview_sample),
+                                "1.2.3",
+                                7,
+                            ),
+                        ),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -151,10 +219,17 @@ fun SettingsScreen(
             }
 
             Text(
-                text = "说明：这些只是「新建时的预填值」，已建项目各自的配置不受影响。",
+                text = stringResource(R.string.settings_footer_note),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
+}
+
+/** 落盘语言选择并重建 Activity：attachBaseContext 阶段才注入 Configuration */
+private fun switchLocale(settings: AppSettings, context: android.content.Context, mode: LocaleMode) {
+    if (settings.state.value.localeMode == mode) return
+    settings.setLocaleMode(mode)
+    (context as? Activity)?.recreate()
 }

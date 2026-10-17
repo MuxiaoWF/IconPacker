@@ -45,12 +45,15 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.core.packer.engine.CropSpec
 import com.muxiao.iconpacker.core.packer.engine.IconShape
 import com.muxiao.iconpacker.core.packer.engine.IconStyle
@@ -58,6 +61,8 @@ import com.muxiao.iconpacker.ui.components.AppScaffold
 import com.muxiao.iconpacker.ui.components.ColorSwatch
 import com.muxiao.iconpacker.ui.components.ColorSwatchRow
 import com.muxiao.iconpacker.ui.components.SectionHeader
+import com.muxiao.iconpacker.ui.components.asString
+import com.muxiao.iconpacker.ui.components.colorSwatchLabelRes
 import com.muxiao.iconpacker.ui.components.iconShapeLabel
 import com.muxiao.iconpacker.ui.theme.Spacing
 import kotlin.math.min
@@ -86,11 +91,12 @@ fun IconEditorScreen(
     viewModel: IconEditorViewModel = viewModel(factory = IconEditorViewModel.factory(packId, slot)),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(state.message) {
         state.message?.let {
-            snackbarHostState.showSnackbar(it)
+            snackbarHostState.showSnackbar(it.asString(context))
             viewModel.consumeMessage()
         }
     }
@@ -99,7 +105,7 @@ fun IconEditorScreen(
     }
 
     AppScaffold(
-        title = state.iconName.ifBlank { "编辑图标" },
+        title = state.iconName.ifBlank { stringResource(R.string.editor_title) },
         onBack = onBack,
         snackbarHostState = snackbarHostState,
         bottomBar = { if (!state.loading) EditorBottomBar(state, viewModel) },
@@ -140,9 +146,9 @@ private fun EditorBody(
         PreviewPanel(preview = state.preview, modifier = Modifier)
 
         // ---- 裁剪 ----
-        SectionHeader("裁剪")
+        SectionHeader(stringResource(R.string.editor_section_crop))
         Text(
-            text = "拖动移动取景框，双指缩放；框内区域即最终图标（正方形）。",
+            text = stringResource(R.string.editor_crop_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -156,7 +162,10 @@ private fun EditorBody(
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "缩放 ${"%.1f".format(style.crop.zoom)}×",
+                    text = stringResource(
+                        R.string.editor_zoom_label,
+                        String.format("%.1f", style.crop.zoom),
+                    ),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -164,14 +173,14 @@ private fun EditorBody(
                 OutlinedButton(
                     onClick = { viewModel.updateStyle(style.copy(crop = CropSpec.DEFAULT)) },
                     enabled = !style.crop.isDefault,
-                ) { Text("重置裁剪") }
+                ) { Text(stringResource(R.string.editor_crop_reset)) }
             }
         } else {
-            Text("源图加载中…", style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.editor_source_loading), style = MaterialTheme.typography.bodySmall)
         }
 
         // ---- 外形（独立裁剪蒙版，不依赖背景色）----
-        SectionHeader("外形")
+        SectionHeader(stringResource(R.string.shape_batch_shape))
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -188,8 +197,12 @@ private fun EditorBody(
 
         // ---- 背景色（默认关闭：不开就不画底板，不会出现"多余的边框"）----
         SwitchRow(
-            title = "背景色",
-            subtitle = if (style.hasBackground) "已开启：内容四周会填色" else "默认不加背景，只保留图标本身",
+            title = stringResource(R.string.shape_batch_bg),
+            subtitle = if (style.hasBackground) {
+                stringResource(R.string.editor_background_on)
+            } else {
+                stringResource(R.string.editor_background_off)
+            },
             checked = style.hasBackground,
             onCheckedChange = { on ->
                 val color = if (on) {
@@ -212,7 +225,9 @@ private fun EditorBody(
         )
         if (style.hasBackground) {
             ColorSwatchRow(
-                entries = IconStyle.PRESET_COLORS.map { (preset, label) -> ColorSwatch(preset, label) },
+                entries = IconStyle.PRESET_COLORS.map { (preset, _) ->
+                    ColorSwatch(preset, stringResource(colorSwatchLabelRes(preset)))
+                },
                 selected = style.backgroundColor,
                 onSelect = { viewModel.updateStyle(style.copy(backgroundColor = it)) },
             )
@@ -220,8 +235,12 @@ private fun EditorBody(
 
         // ---- 边框（默认关闭）----
         SwitchRow(
-            title = "边框",
-            subtitle = if (style.hasBorder) "已开启：沿外形描边" else "默认不加边框",
+            title = stringResource(R.string.editor_border_title),
+            subtitle = if (style.hasBorder) {
+                stringResource(R.string.editor_border_on)
+            } else {
+                stringResource(R.string.editor_border_off)
+            },
             checked = style.hasBorder,
             onCheckedChange = { on ->
                 viewModel.updateStyle(
@@ -238,7 +257,7 @@ private fun EditorBody(
         )
         if (style.hasBorder) {
             Text(
-                text = "粗细 ${(style.borderWidth * 100).roundToInt()}%（占图标边长）",
+                text = stringResource(R.string.editor_border_width, (style.borderWidth * 100).roundToInt()),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -247,9 +266,11 @@ private fun EditorBody(
                 onValueChange = { viewModel.updateStyle(style.copy(borderWidth = it)) },
                 valueRange = 0.01f..0.12f,
             )
-            Text("颜色", style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.editor_border_color), style = MaterialTheme.typography.labelMedium)
             ColorSwatchRow(
-                entries = IconStyle.PRESET_BORDER_COLORS.map { (preset, label) -> ColorSwatch(preset, label) },
+                entries = IconStyle.PRESET_BORDER_COLORS.map { (preset, _) ->
+                    ColorSwatch(preset, stringResource(colorSwatchLabelRes(preset)))
+                },
                 selected = style.borderColor,
                 onSelect = { viewModel.updateStyle(style.copy(borderColor = it)) },
             )
@@ -257,8 +278,8 @@ private fun EditorBody(
 
         // ---- 内容缩放 ----
         SectionHeader(
-            "内容缩放 ${(style.contentScale * 100).roundToInt()}%" +
-                if (style.contentScale >= 0.999f) "（铺满）" else "",
+            stringResource(R.string.editor_scale_label, (style.contentScale * 100).roundToInt()) +
+                if (style.contentScale >= 0.999f) stringResource(R.string.editor_scale_fill) else "",
         )
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             Slider(
@@ -268,7 +289,7 @@ private fun EditorBody(
             )
             if (!style.hasBackground && !style.hasBorder && style.contentScale < 0.999f) {
                 Text(
-                    text = "未开启背景/边框时缩小内容会留出透明边距。",
+                    text = stringResource(R.string.editor_scale_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -277,7 +298,7 @@ private fun EditorBody(
 
         if (state.hasEdit) {
             Text(
-                text = "当前图标已保存过编辑产物，再次保存将覆盖；还原可恢复原图。",
+                text = stringResource(R.string.editor_overwrite_warn),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -299,12 +320,12 @@ private fun PreviewPanel(preview: ImageBitmap?, modifier: Modifier = Modifier) {
         if (preview != null) {
             Image(
                 bitmap = preview,
-                contentDescription = "图标预览",
+                contentDescription = stringResource(R.string.cd_editor_preview),
                 modifier = Modifier.size(152.dp),
                 contentScale = ContentScale.Fit,
             )
         } else {
-            Text("无法生成预览", style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.editor_preview_failed), style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -325,14 +346,14 @@ private fun EditorBottomBar(
             OutlinedButton(
                 onClick = viewModel::reset,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("还原为原图") }
+            ) { Text(stringResource(R.string.editor_restore)) }
         }
         Button(
             onClick = viewModel::save,
             enabled = !state.saving,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(if (state.saving) "保存中…" else "保存")
+            Text(if (state.saving) stringResource(R.string.editor_saving) else stringResource(R.string.common_save))
         }
     }
 }

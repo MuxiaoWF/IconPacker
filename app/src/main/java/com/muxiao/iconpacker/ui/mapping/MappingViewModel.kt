@@ -14,7 +14,10 @@ import com.muxiao.iconpacker.data.AppInfoProvider
 import com.muxiao.iconpacker.data.IconAssetEntity
 import com.muxiao.iconpacker.data.PackRepository
 import com.muxiao.iconpacker.domain.IconUsageIndex
+import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.domain.ImportOutcome
+import com.muxiao.iconpacker.ui.components.UiText
+import com.muxiao.iconpacker.ui.components.uiMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -57,7 +60,7 @@ data class MappingUiState(
     val onlyUnmapped: Boolean = false,
     val loading: Boolean = true,
     val importing: Boolean = false,
-    val message: String? = null,
+    val message: List<UiText>? = null,
 ) {
     val mappedCount: Int get() = apps.count { it.assignedSlot != null }
     val visibleApps: List<AppRow>
@@ -79,14 +82,14 @@ class MappingViewModel(
 
     private val appsFlow = MutableStateFlow<List<AppInfoProvider.AppEntry>>(emptyList())
     private val queryFlow = MutableStateFlow("")
-    private val messageFlow = MutableStateFlow<String?>(null)
+    private val messageFlow = MutableStateFlow<List<UiText>?>(null)
     private val importingFlow = MutableStateFlow(false)
     private val unmappedOnlyFlow = MutableStateFlow(false)
 
     /** 搜索行下方控件共用的小状态包 */
     private data class ListControls(
         val query: String,
-        val message: String?,
+        val message: List<UiText>?,
         val importing: Boolean,
         val onlyUnmapped: Boolean,
     )
@@ -168,7 +171,7 @@ class MappingViewModel(
             val fixed = runCatching { repository.reconcileMappings(packId) }.getOrDefault(0)
             appsFlow.value = repository.loadApps()
             if (fixed > 0) {
-                messageFlow.value = "已为 $fixed 个新安装的应用启用预置图标"
+                messageFlow.value = listOf(UiText(R.string.msg_preset_activated, fixed))
             }
         }
     }
@@ -194,9 +197,9 @@ class MappingViewModel(
             if (fromComponent != null && fromComponent != component) {
                 val displaced = repository.remapComponent(packId, fromComponent, component, slot)
                 messageFlow.value = if (displaced != null) {
-                    "映射已改指向 $target（该目标原有的映射被替换）"
+                    listOf(UiText(R.string.msg_retarget_displaced, target))
                 } else {
-                    "映射已改指向 $target"
+                    listOf(UiText(R.string.msg_retarget, target))
                 }
             } else {
                 val previousSlot = repository.setMapping(packId, component, slot)
@@ -205,7 +208,7 @@ class MappingViewModel(
                 messageFlow.value = if (previousSlot == null || previousSlot == slot) {
                     null
                 } else {
-                    "已将 $target 的映射改到这张图标上（它原有的映射已被替换）"
+                    listOf(UiText(R.string.msg_reassign_icon, target))
                 }
             }
         }
@@ -218,7 +221,11 @@ class MappingViewModel(
     fun autoMatch() {
         viewModelScope.launch {
             val count = repository.autoMatch(packId)
-            messageFlow.value = if (count > 0) "自动匹配新增 $count 个映射" else "没有找到可自动匹配的应用"
+            messageFlow.value = if (count > 0) {
+                listOf(UiText(R.string.msg_automatch_added, count))
+            } else {
+                listOf(UiText(R.string.msg_automatch_none))
+            }
         }
     }
 
@@ -227,7 +234,7 @@ class MappingViewModel(
         viewModelScope.launch {
             importingFlow.value = true
             val outcome = runCatching { repository.importFromUris(packId, uris) }
-                .onFailure { messageFlow.value = "导入失败：${it.message}" }
+                .onFailure { messageFlow.value = listOf(it.uiMessage(R.string.msg_import_failed)) }
                 .getOrNull()
             importingFlow.value = false
             outcome?.let { messageFlow.value = describeImport(it, fromZip = false) }
@@ -238,7 +245,7 @@ class MappingViewModel(
         viewModelScope.launch {
             importingFlow.value = true
             val outcome = runCatching { repository.importFromZip(packId, uri) }
-                .onFailure { messageFlow.value = "导入失败：${it.message}" }
+                .onFailure { messageFlow.value = listOf(it.uiMessage(R.string.msg_import_failed)) }
                 .getOrNull()
             importingFlow.value = false
             outcome?.let { messageFlow.value = describeImport(it, fromZip = true) }
@@ -246,43 +253,52 @@ class MappingViewModel(
     }
 
     /**
-     * 导入结果文案。
+     * 导入结果文案（分项，UI 侧按本地化分隔符拼接）。
      *
      * 分项而不是只报总数：用户需要知道"为什么只建立了 9 个映射"以及"包里那些图去哪了"。
      * 静默丢弃与静默不匹配，是这一块最容易积累困惑的地方。
      */
-    private fun describeImport(outcome: ImportOutcome, fromZip: Boolean): String {
+    private fun describeImport(outcome: ImportOutcome, fromZip: Boolean): List<UiText> {
         if (outcome.imported == 0) {
-            return when {
-                outcome.truncated > 0 -> "图标池已满（上限 ${PackRepository.MAX_SLOTS} 个），未能导入"
-                fromZip -> "ZIP 中未找到可用的图片文件"
-                else -> "没有导入任何图标"
-            }
+            return listOf(
+                when {
+                    outcome.truncated > 0 ->
+                        UiText(R.string.msg_import_pool_full, PackRepository.MAX_SLOTS)
+                    fromZip -> UiText(R.string.msg_zip_no_images)
+                    else -> UiText(R.string.msg_import_none)
+                },
+            )
         }
-        val parts = ArrayList<String>(5)
-        parts += if (fromZip) "已从 ZIP 导入 ${outcome.imported} 个图标" else "已导入 ${outcome.imported} 个图标"
+        val parts = ArrayList<UiText>(5)
+        parts += if (fromZip) {
+            UiText(R.string.msg_imported_from_zip, outcome.imported)
+        } else {
+            UiText(R.string.msg_imported, outcome.imported)
+        }
 
         if (outcome.autoMapped > 0) {
-            val detail = buildList {
-                if (outcome.manifestMapped > 0) add("包内映射表 ${outcome.manifestMapped}")
-                if (outcome.packageMapped > 0) add("包名匹配 ${outcome.packageMapped}")
-            }.joinToString("、")
-            parts += "自动建立 ${outcome.autoMapped} 个映射（$detail）"
+            val detail = buildList<UiText> {
+                if (outcome.manifestMapped > 0) add(UiText(R.string.msg_automap_manifest, outcome.manifestMapped))
+                if (outcome.packageMapped > 0) add(UiText(R.string.msg_automap_package, outcome.packageMapped))
+            }.flatMapIndexed { i, part ->
+                if (i == 0) listOf(part) else listOf(UiText(R.string.mapping_automap_sep), part)
+            }
+            parts += UiText(R.string.msg_automap_detail, outcome.autoMapped, detail)
             // 预置映射单独报出——这是用户唯一能感知"图标包已经替将来做好了准备"的信号。
             // 映射列表里不列这些条目（见 [AppRow]），少了这句，那部分图标就像凭空消失了。
             if (outcome.presetMapped > 0) {
-                parts += "另有 ${outcome.presetMapped} 个映射的目标应用未在本机安装，装上后自动生效"
+                parts += UiText(R.string.msg_automap_preset, outcome.presetMapped)
             }
         } else if (fromZip && outcome.manifestPath == null) {
-            parts += "包内未发现 appfilter.xml，可按名称手动匹配"
+            parts += UiText(R.string.msg_zip_no_appfilter)
         } else if (fromZip) {
-            parts += "未自动匹配到应用，可点「一键自动匹配」按名称匹配"
+            parts += UiText(R.string.msg_zip_no_auto_match)
         }
 
-        if (outcome.duplicates > 0) parts += "合并 ${outcome.duplicates} 个多密度副本"
-        if (outcome.skipped > 0) parts += "跳过 ${outcome.skipped} 个非图片文件"
-        if (outcome.truncated > 0) parts += "另有 ${outcome.truncated} 个超出槽位上限未导入"
-        return parts.joinToString("；")
+        if (outcome.duplicates > 0) parts += UiText(R.string.msg_import_merged, outcome.duplicates)
+        if (outcome.skipped > 0) parts += UiText(R.string.msg_import_skipped, outcome.skipped)
+        if (outcome.truncated > 0) parts += UiText(R.string.msg_import_truncated, outcome.truncated)
+        return parts
     }
 
     fun deleteIcon(slot: Int) {
@@ -312,14 +328,16 @@ class MappingViewModel(
             )
             val result = runCatching {
                 repository.batchApplyShape(packId, style, overwriteEdited)
-            }.onFailure { messageFlow.value = "统一形状失败：${it.message}" }
+            }.onFailure { messageFlow.value = listOf(it.uiMessage(R.string.msg_shape_failed)) }
                 .getOrNull()
             importingFlow.value = false
             result?.let { (applied, skipped) ->
                 messageFlow.value = when {
-                    applied == 0 && skipped > 0 -> "没有可应用的图标（$skipped 个已单独编辑过）"
-                    skipped > 0 -> "已统一应用 $applied 个图标，跳过 $skipped 个已单独编辑的"
-                    else -> "已统一应用 $applied 个图标"
+                    applied == 0 && skipped > 0 ->
+                        listOf(UiText(R.string.msg_batch_none_applied, skipped))
+                    skipped > 0 ->
+                        listOf(UiText(R.string.msg_batch_applied_skipped, applied, skipped))
+                    else -> listOf(UiText(R.string.msg_batch_applied, applied))
                 }
             }
         }

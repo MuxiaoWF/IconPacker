@@ -32,6 +32,8 @@ class AppSettings(context: Context) {
         val artifactTemplate: String = DEFAULT_ARTIFACT_TEMPLATE,
         /** 外观模式：跟随系统 / 浅色 / 深色（ThemeMode 序列化串） */
         val themeMode: ThemeMode = ThemeMode.FollowSystem,
+        /** 应用内语言：跟随系统 / 中文 / 英文（LocaleMode 序列化串） */
+        val localeMode: LocaleMode = LocaleMode.FollowSystem,
     )
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -57,6 +59,8 @@ class AppSettings(context: Context) {
 
     fun setThemeMode(value: ThemeMode) = edit { it.putString(KEY_THEME_MODE, value.name) }
 
+    fun setLocaleMode(value: LocaleMode) = edit { it.putString(KEY_LOCALE_MODE, value.name) }
+
     private inline fun edit(block: (android.content.SharedPreferences.Editor) -> Unit) {
         prefs.edit().also(block).apply()
     }
@@ -70,10 +74,21 @@ class AppSettings(context: Context) {
         artifactTemplate = prefs.getString(KEY_ARTIFACT_TEMPLATE, DEFAULT_ARTIFACT_TEMPLATE)
             .orEmpty().ifBlank { DEFAULT_ARTIFACT_TEMPLATE },
         themeMode = ThemeMode.from(prefs.getString(KEY_THEME_MODE, null)),
+        localeMode = LocaleMode.from(prefs.getString(KEY_LOCALE_MODE, null)),
     )
 
     companion object {
         private const val PREFS_NAME = "app_settings"
+
+        /**
+         * 只读语言设置，供 `MainActivity.attachBaseContext` 使用——
+         * 那一刻不能实例化完整 [AppSettings]（会多挂一个无谓的 prefs listener）。
+         */
+        fun readLocaleMode(context: Context): LocaleMode =
+            LocaleMode.from(
+                context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                    .getString(KEY_LOCALE_MODE, null),
+            )
 
         /** 导出建议名的默认模板：与设置页出现前的行为逐字节一致 */
         const val DEFAULT_ARTIFACT_TEMPLATE = "IconPack-{name}-v{code}.apk"
@@ -85,5 +100,6 @@ class AppSettings(context: Context) {
         private const val KEY_SCHEME_V3 = "default_scheme_v3"
         private const val KEY_ARTIFACT_TEMPLATE = "artifact_template"
         private const val KEY_THEME_MODE = "theme_mode"
+        private const val KEY_LOCALE_MODE = "locale_mode"
     }
 }

@@ -28,7 +28,10 @@ class LauncherCompat(private val context: Context) {
         val isCurrent: Boolean,
         val isKnown: Boolean,
         val supportLevel: LauncherSupport.SupportLevel,
-        val guidance: String? = null,
+        /** 本地化展示名（优先于 [label]），随语言切换 */
+        val nameRes: Int? = null,
+        /** 引导文案资源 id（用户可见）；无引导文案为 null */
+        val guidanceRes: Int? = null,
     )
 
     /** 当前默认启动器包名（解析不到返回 null，如刚开机/多用户异常态） */
@@ -76,9 +79,9 @@ class LauncherCompat(private val context: Context) {
         return if (hit) LauncherSupport.SupportLevel.SUPPORTED else LauncherSupport.SupportLevel.UNKNOWN
     }
 
-    fun currentGuidance(): String? {
+    fun currentGuidanceRes(): Int? {
         val current = currentLauncherPackage() ?: return null
-        return LauncherSupport.classify(current)?.guidance
+        return LauncherSupport.classify(current)?.guidanceRes
     }
 
     /** 打开系统"默认启动器/主屏幕应用"设置页 */
@@ -116,7 +119,8 @@ class LauncherCompat(private val context: Context) {
                         isCurrent = r.packageName == currentPackage,
                         isKnown = profile != null,
                         supportLevel = profile?.supportLevel ?: LauncherSupport.SupportLevel.UNKNOWN,
-                        guidance = profile?.guidance,
+                        nameRes = profile?.nameRes,
+                        guidanceRes = profile?.guidanceRes,
                     )
                 }
                 .sortedBy { it.label }

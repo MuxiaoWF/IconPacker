@@ -1,5 +1,8 @@
 package com.muxiao.iconpacker.domain
 
+import androidx.annotation.StringRes
+import com.muxiao.iconpacker.R
+
 /**
  * 图标包版本规则（FR-02 补充）。
  *
@@ -27,12 +30,12 @@ object PackVersionRules {
      */
     const val MAX_CODE = 2_000_000_000
 
-    /** 校验失败原因（文案直接面向用户） */
-    enum class Issue(val message: String) {
-        NAME_EMPTY("版本名不能为空"),
-        NAME_TOO_LONG("版本名最多 $MAX_NAME_LENGTH 个字符"),
-        CODE_NOT_POSITIVE("版本号必须是大于 0 的整数"),
-        CODE_TOO_LARGE("版本号过大，最大 $MAX_CODE"),
+    /** 校验失败原因（文案为资源 id，随界面语言切换；JVM 单测只断言枚举身份） */
+    enum class Issue(@StringRes val messageRes: Int) {
+        NAME_EMPTY(R.string.err_version_name_empty),
+        NAME_TOO_LONG(R.string.err_version_name_too_long),
+        CODE_NOT_POSITIVE(R.string.err_code_not_positive),
+        CODE_TOO_LARGE(R.string.err_code_too_large),
     }
 
     /** 校验版本名；返回 null 表示合法 */

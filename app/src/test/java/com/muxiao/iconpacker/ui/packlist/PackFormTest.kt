@@ -1,5 +1,7 @@
 package com.muxiao.iconpacker.ui.packlist
 
+import com.muxiao.iconpacker.R
+import com.muxiao.iconpacker.ui.components.UiText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -56,10 +58,10 @@ class PackFormTest {
         val form = PackForm()
         form.name = "测试包"
         form.importedKey = true
-        assertEquals("导入密钥库需先选择密钥库文件", form.signIssue)
+        assertEquals(UiText(R.string.form_sign_needs_file), form.signIssue)
 
         form.keystorePath = "/private/keystores/ks_1.keystore"
-        assertEquals("导入密钥库需填写密钥别名", form.signIssue)
+        assertEquals(UiText(R.string.form_sign_needs_alias), form.signIssue)
 
         form.keystoreAlias = "key0"
         assertTrue(form.isValid)
@@ -72,7 +74,7 @@ class PackFormTest {
         form.schemeV1 = false
         form.schemeV2 = false
         form.schemeV3 = false
-        assertEquals("至少保留一种签名方案", form.signIssue)
+        assertEquals(UiText(R.string.form_sign_needs_scheme), form.signIssue)
         assertFalse(form.isValid)
     }
 

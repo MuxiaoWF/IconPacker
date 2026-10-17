@@ -7,12 +7,15 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.muxiao.iconpacker.ServiceLocator
+import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.data.AppSettings
 import com.muxiao.iconpacker.data.InstalledPackChecker
 import com.muxiao.iconpacker.data.PackEntity
 import com.muxiao.iconpacker.data.PackRepository
 import com.muxiao.iconpacker.data.PackSignConfig
 import com.muxiao.iconpacker.domain.PackVersionRules
+import com.muxiao.iconpacker.ui.components.UiText
+import com.muxiao.iconpacker.ui.components.uiMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,7 +42,7 @@ data class PackListUiState(
     val backupBusyPackId: Long? = null,
     /** 备份导入进行中（v8）；完成后 createdPackId 被置位跳转映射工作台 */
     val importingBackup: Boolean = false,
-    val message: String? = null,
+    val message: UiText? = null,
     /** 刚创建成功的项目 id（用于创建后直达编辑页，消费后置空） */
     val createdPackId: Long? = null,
 ) {
@@ -51,11 +54,11 @@ data class PackListUiState(
     }
 
     /** 安装状态徽标（FR-08：与该**项目自己包名**对应的已安装版本对比） */
-    fun installLabelOf(pack: PackEntity): String =
+    fun installLabelOf(pack: PackEntity): UiText =
         when (val installed = installedVersions[pack.packageName]) {
-            null -> "未安装"
-            pack.versionCode.toLong() -> "已是最新"
-            else -> "可更新（已装 v$installed → v${pack.versionCode}）"
+            null -> UiText(R.string.packlist_install_not_installed)
+            pack.versionCode.toLong() -> UiText(R.string.packlist_install_latest)
+            else -> UiText(R.string.packlist_install_update, installed, pack.versionCode)
         }
 }
 
@@ -80,7 +83,7 @@ class PackListViewModel(
     private val refreshTrigger = MutableStateFlow(0)
 
     private val exportingFlow = MutableStateFlow<Long?>(null)
-    private val messageFlow = MutableStateFlow<String?>(null)
+    private val messageFlow = MutableStateFlow<UiText?>(null)
     private val createdPackIdFlow = MutableStateFlow<Long?>(null)
     private val backupBusyFlow = MutableStateFlow<Long?>(null)
     private val importingBackupFlow = MutableStateFlow(false)
@@ -144,7 +147,7 @@ class PackListViewModel(
                     PackVersionRules.Parsed.Auto -> null
                     is PackVersionRules.Parsed.Explicit -> parsed.code
                     PackVersionRules.Parsed.Invalid -> {
-                        messageFlow.value = "版本号必须是大于 0 的整数"
+                        messageFlow.value = UiText(R.string.msg_version_code_invalid)
                         return@launch
                     }
                 }
@@ -160,12 +163,14 @@ class PackListViewModel(
                 )
                 if (draft.iconUri != null) {
                     runCatching { repository.setPackIcon(id, draft.iconUri) }
-                        .onFailure { messageFlow.value = "已创建图标包，但图标设置失败：${it.message}" }
+                        .onFailure {
+                            messageFlow.value = UiText(R.string.msg_pack_created_icon_failed, it.message.orEmpty())
+                        }
                 }
                 // 创建成功即直达映射工作台：新项目已自动持久化，用户可直接开始导入图标
                 createdPackIdFlow.value = id
             } catch (e: Exception) {
-                messageFlow.value = "创建失败：${e.message}"
+                messageFlow.value = UiText(R.string.msg_create_failed, e.message.orEmpty())
             }
         }
     }
@@ -187,8 +192,8 @@ class PackListViewModel(
         viewModelScope.launch {
             val result = runCatching { repository.setSigningConfig(pack.id, config) }
             messageFlow.value = result.fold(
-                onSuccess = { "签名配置已更新" },
-                onFailure = { "签名配置不可用：${it.message}" },
+                onSuccess = { UiText(R.string.msg_sign_config_updated) },
+                onFailure = { it.uiMessage(R.string.msg_sign_config_invalid) },
             )
         }
     }
@@ -198,8 +203,8 @@ class PackListViewModel(
         viewModelScope.launch {
             val result = runCatching { repository.duplicatePack(pack.id) }
             messageFlow.value = result.fold(
-                onSuccess = { "已复制为「${pack.name}（副本）」" },
-                onFailure = { "复制失败：${it.message}" },
+                onSuccess = { UiText(R.string.msg_duplicated, "${pack.name}（副本）") },
+                onFailure = { it.uiMessage(R.string.msg_duplicate_failed) },
             )
         }
     }
@@ -223,8 +228,8 @@ class PackListViewModel(
         viewModelScope.launch {
             val result = runCatching { repository.setPackageName(pack.id, trimmed) }
             messageFlow.value = result.fold(
-                onSuccess = { "包名已更新为 $trimmed" },
-                onFailure = { "包名不可用：${it.message}" },
+                onSuccess = { UiText(R.string.msg_package_name_updated, trimmed) },
+                onFailure = { it.uiMessage(R.string.msg_package_name_invalid) },
             )
         }
     }
@@ -235,11 +240,13 @@ class PackListViewModel(
             val result = runCatching { repository.setBuildSdk(pack.id, minSdkOverride, targetSdkOverride) }
             messageFlow.value = result.fold(
                 onSuccess = {
-                    val min = minSdkOverride?.let { "min $it" } ?: "min 沿用模板"
-                    val target = targetSdkOverride?.let { "target $it" } ?: "target 沿用模板"
-                    "产物 SDK 已更新（$min / $target）"
+                    UiText(
+                        R.string.msg_sdk_updated,
+                        minSdkOverride?.let { "min $it" } ?: UiText(R.string.packlist_sdk_min_template),
+                        targetSdkOverride?.let { "target $it" } ?: UiText(R.string.packlist_sdk_target_template),
+                    )
                 },
-                onFailure = { "SDK 设置失败：${it.message}" },
+                onFailure = { it.uiMessage(R.string.msg_sdk_update_failed) },
             )
         }
     }
@@ -249,8 +256,8 @@ class PackListViewModel(
         viewModelScope.launch {
             val result = runCatching { repository.setPackIcon(pack.id, uri) }
             messageFlow.value = result.fold(
-                onSuccess = { "已设置图标包图标" },
-                onFailure = { "设置图标失败：${it.message}" },
+                onSuccess = { UiText(R.string.msg_pack_icon_set) },
+                onFailure = { it.uiMessage(R.string.msg_pack_icon_failed) },
             )
         }
     }
@@ -279,15 +286,21 @@ class PackListViewModel(
             PackVersionRules.Parsed.Auto -> null
             is PackVersionRules.Parsed.Explicit -> parsed.code.takeIf { it != autoNext }
             PackVersionRules.Parsed.Invalid -> {
-                messageFlow.value = "版本号必须是大于 0 的整数"
+                messageFlow.value = UiText(R.string.msg_version_code_invalid)
                 return
             }
         }
         viewModelScope.launch {
             val result = runCatching { repository.setVersionInfo(pack.id, versionName, next) }
             messageFlow.value = result.fold(
-                onSuccess = { "版本已更新为 ${versionName.trim()}（下次打包 v${next ?: autoNext}）" },
-                onFailure = { "版本设置失败：${it.message}" },
+                onSuccess = {
+                    UiText(
+                        R.string.msg_version_updated,
+                        versionName.trim(),
+                        next ?: autoNext,
+                    )
+                },
+                onFailure = { it.uiMessage(R.string.msg_version_update_failed) },
             )
         }
     }
@@ -306,8 +319,8 @@ class PackListViewModel(
             val result = runCatching { repository.exportLatestArtifact(pack.id, target) }
             exportingFlow.value = null
             messageFlow.value = result.fold(
-                onSuccess = { "已导出（${it / 1024} KB）" },
-                onFailure = { "导出失败：${it.message}" },
+                onSuccess = { UiText(R.string.msg_exported, it / 1024) },
+                onFailure = { it.uiMessage(R.string.msg_export_failed) },
             )
         }
     }
@@ -319,8 +332,8 @@ class PackListViewModel(
             val result = runCatching { ServiceLocator.projectBackup.exportProject(pack.id, uri) }
             backupBusyFlow.value = null
             messageFlow.value = result.fold(
-                onSuccess = { "已导出项目备份（${it / 1024} KB）" },
-                onFailure = { "备份导出失败：${it.message}" },
+                onSuccess = { UiText(R.string.msg_backup_exported, it / 1024) },
+                onFailure = { it.uiMessage(R.string.msg_backup_export_failed) },
             )
         }
     }
@@ -333,17 +346,16 @@ class PackListViewModel(
             importingBackupFlow.value = false
             result.fold(
                 onSuccess = { packId ->
-                    messageFlow.value = "项目已导入；备份不含密钥库，打包将用本机新密钥签名" +
-                        "（换设备后无法覆盖旧安装，需先卸载旧产物）"
+                    messageFlow.value = UiText(R.string.msg_backup_imported)
                     createdPackIdFlow.value = packId
                 },
-                onFailure = { messageFlow.value = "备份导入失败：${it.message}" },
+                onFailure = { messageFlow.value = UiText(R.string.msg_backup_import_failed, it.message.orEmpty()) },
             )
         }
     }
 
     /** 密钥库导入等后台转前台操作在场外失败时，把原因投递到界面 Snackbar */
-    fun postMessage(text: String) {
+    fun postMessage(text: UiText) {
         messageFlow.value = text
     }
 

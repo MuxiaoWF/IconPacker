@@ -1,0 +1,370 @@
+<resources>
+    <string name="app_name">IconPacker</string>
+
+    <!-- ===== Shared components ===== -->
+    <string name="cd_back">Back</string>
+    <string name="color_none">None</string>
+    <string name="color_paper_white">Paper white</string>
+    <string name="color_ink_black">Ink black</string>
+    <string name="color_brand_blue">Brand blue</string>
+    <string name="color_teal">Teal</string>
+    <string name="color_amber">Amber</string>
+    <string name="color_vermilion">Vermilion</string>
+    <string name="color_white">White</string>
+    <string name="color_light_gray">Light gray</string>
+    <string name="shape_original">Original</string>
+    <string name="shape_circle">Circle</string>
+    <string name="shape_rounded">Rounded</string>
+    <string name="shape_squircle">Squircle</string>
+
+    <!-- ===== Settings ===== -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="theme_mode_follow_system">Follow system</string>
+    <string name="theme_mode_light">Light</string>
+    <string name="theme_mode_dark">Dark</string>
+    <string name="settings_theme_desc_follow">Follows the system\'s dark/light setting automatically</string>
+    <string name="settings_theme_desc_light">Always use the light theme</string>
+    <string name="settings_theme_desc_dark">Always use the dark theme</string>
+    <string name="settings_section_language">Language</string>
+    <string name="settings_language_system">Follow system</string>
+    <string name="settings_language_desc">After a manual choice the app UI switches to that language; "Follow system" tracks the system language (including per-app language in system settings).</string>
+    <string name="settings_section_defaults">Defaults for new projects</string>
+    <string name="settings_default_version_name">Default version name</string>
+    <string name="settings_default_version_name_hint">Leave blank to use the built-in default (1.0)</string>
+    <string name="settings_default_signer_name">Default signer name</string>
+    <string name="settings_default_signer_name_hint">File name used by the v1 signing entry; leave blank for the built-in default</string>
+    <string name="settings_default_schemes">Default signing schemes</string>
+    <string name="settings_schemes_all_off">All schemes are off: when you save a new project you\'ll be asked to keep at least one, and the "Create" button will be disabled</string>
+    <string name="settings_section_artifact_template">Export artifact file name template</string>
+    <string name="settings_artifact_template">File name template</string>
+    <string name="settings_artifact_template_hint">Placeholders: {name} project name · {version} version name · {code} version code</string>
+    <string name="settings_artifact_preview">Preview: %1$s</string>
+    <string name="settings_artifact_preview_sample">My theme</string>
+    <string name="settings_footer_note">Note: these only pre-fill the "new project" form; existing projects keep their own settings.</string>
+
+    <!-- ===== First-run onboarding ===== -->
+    <string name="onboarding_title">Welcome to IconPacker</string>
+    <string name="onboarding_intro">IconPacker turns your own icons into an installable icon pack APK in one tap.</string>
+    <string name="onboarding_prereq_title">Requirement: a compatible launcher</string>
+    <string name="onboarding_prereq_body">Most OEM system launchers (Pixel Launcher, One UI Home, MIUI, etc.) use their own theming and don\'t apply standard third-party icon packs. The reliable path is to install a launcher that supports icon packs (Nova, Lawnchair, Apex, …) and enable the pack this app builds in its icon style settings.</string>
+    <string name="onboarding_status_supported">Your current launcher "%1$s" supports icon packs</string>
+    <string name="onboarding_status_limited">Your current launcher "%1$s" may support icon packs (apply it in the launcher\'s settings)</string>
+    <string name="onboarding_status_none">No default launcher detected</string>
+    <string name="onboarding_status_unknown">Can\'t confirm whether "%1$s" supports icon packs; consider installing Nova or Lawnchair</string>
+    <string name="onboarding_detected_count">%1$d launchers detected</string>
+    <string name="onboarding_set_default_launcher">Set default launcher</string>
+    <string name="onboarding_redetect">Re-detect</string>
+    <string name="onboarding_enter_app">Open app</string>
+    <string name="onboarding_skip_hint">You can open the app without configuring this; you can also change the default launcher anytime in system settings.</string>
+    <string name="onboarding_checking">Detecting…</string>
+    <string name="launcher_current_suffix">(current)</string>
+    <string name="launcher_badge_supported">Icon pack support</string>
+    <string name="launcher_badge_limited">Try it</string>
+    <string name="launcher_badge_unknown">Unknown</string>
+    <string name="launcher_name_lawnchair_legacy">Lawnchair (legacy)</string>
+    <string name="launcher_name_coloros">ColorOS launcher</string>
+    <string name="launcher_name_oppo">OPPO launcher</string>
+    <string name="launcher_name_realme">realme launcher</string>
+    <string name="launcher_name_system">System launcher</string>
+    <string name="launcher_name_miui">MIUI / HyperOS launcher</string>
+    <string name="launcher_name_huawei">Huawei launcher</string>
+    <string name="launcher_name_vivo">vivo launcher</string>
+    <string name="launcher_name_meizu">Meizu launcher</string>
+    <string name="launcher_guide_coloros">ColorOS\'s "Icons" feature goes through the ART+/theme store system and doesn\'t support third-party icon pack APKs (verified on ColorOS 14). Install Nova Launcher or Lawnchair, then enable this icon pack there.</string>
+    <string name="launcher_guide_oppo">OPPO\'s home is built on ColorOS and doesn\'t support third-party icon pack APKs yet. Install Nova Launcher or Lawnchair.</string>
+    <string name="launcher_guide_realme">realme UI doesn\'t support standard third-party icon packs by default. Install Nova Launcher or Lawnchair for full icon pack support.</string>
+    <string name="launcher_guide_android">This launcher likely uses a proprietary theming mechanism (OPPO ColorOS 14 was verified not to). Install Nova Launcher or Lawnchair for the best compatibility.</string>
+    <string name="launcher_guide_oneui">One UI uses Galaxy Themes and doesn\'t apply standard third-party icon packs. Install Nova Launcher or Lawnchair.</string>
+    <string name="launcher_guide_pixel">Pixel Launcher doesn\'t support standard third-party icon packs. Install Nova Launcher or Lawnchair.</string>
+    <string name="launcher_guide_miui">Xiaomi\'s launcher uses its own theme store and doesn\'t apply standard third-party icon packs. Install Nova Launcher or Lawnchair.</string>
+    <string name="launcher_guide_huawei">Huawei\'s launcher uses its own theming and doesn\'t apply standard third-party icon packs. Install Nova Launcher or Lawnchair.</string>
+    <string name="launcher_guide_vivo">vivo\'s launcher relies on a theme app and doesn\'t apply standard third-party icon packs. Install Nova Launcher or Lawnchair.</string>
+    <string name="launcher_guide_meizu">Meizu\'s launcher uses its own theming and doesn\'t apply standard third-party icon packs. Install Nova Launcher or Lawnchair.</string>
+
+    <!-- ===== Project list (FR-02/FR-08) ===== -->
+    <string name="packlist_title">My icon packs</string>
+    <string name="packlist_import">Import</string>
+    <string name="packlist_importing">Importing</string>
+    <string name="cd_settings">Settings</string>
+    <string name="cd_create_pack">Create icon pack</string>
+    <string name="packlist_empty">No icon packs yet.\nTap the button at the bottom right to create your first one, then import icons, map them to apps, and build in one tap.</string>
+    <string name="packlist_backup_filename">%1$s-backup.zip</string>
+    <string name="packlist_delete_title">Delete icon pack</string>
+    <string name="packlist_delete_confirm">"%1$s" and all of its mappings, icons and build artifacts will be deleted. This can\'t be undone.</string>
+    <string name="packlist_version_status">Version %1$s (v%2$d) · %3$s</string>
+    <string name="pack_status_never_packed">Never built</string>
+    <string name="pack_status_dirty">Unsaved changes</string>
+    <string name="pack_status_packed">Built</string>
+    <string name="packlist_next_version">Next build v%1$d (set manually)</string>
+    <string name="packlist_install_not_installed">Not installed</string>
+    <string name="packlist_install_latest">Up to date</string>
+    <string name="packlist_install_update">Update available (installed v%1$d → v%2$d)</string>
+    <string name="cd_more">More actions</string>
+    <string name="cd_pack_icon">Icon pack icon</string>
+    <string name="pack_icon_unset">Not set</string>
+    <string name="packlist_sdk_min_template">min from template</string>
+    <string name="packlist_sdk_target_template">target from template</string>
+
+    <!-- ===== Shared buttons/dialogs ===== -->
+    <string name="common_cancel">Cancel</string>
+    <string name="common_delete">Delete</string>
+    <string name="common_save">Save</string>
+    <string name="common_create">Create</string>
+    <string name="common_confirm">OK</string>
+
+    <!-- ===== Context menus ===== -->
+    <string name="menu_edit_pack">Edit name &amp; icon</string>
+    <string name="menu_export_artifact">Export artifact</string>
+    <string name="menu_duplicate">Duplicate project</string>
+    <string name="menu_export_backup">Export project backup (ZIP, no keystore)</string>
+
+    <!-- ===== Messages (project list VM) ===== -->
+    <string name="msg_version_code_invalid">Version code must be an integer greater than 0</string>
+    <string name="msg_keystore_read_failed">Couldn\'t read the keystore file: %1$s</string>
+    <string name="msg_pack_created_icon_failed">The icon pack was created, but setting its icon failed: %1$s</string>
+    <string name="msg_create_failed">Creation failed: %1$s</string>
+    <string name="msg_sign_config_updated">Signing configuration updated</string>
+    <string name="msg_sign_config_invalid">Signing configuration is invalid: %1$s</string>
+    <string name="msg_duplicated">Duplicated as "%1$s"</string>
+    <string name="msg_duplicate_failed">Duplication failed: %1$s</string>
+    <string name="msg_package_name_updated">Package name updated to %1$s</string>
+    <string name="msg_package_name_invalid">Package name is invalid: %1$s</string>
+    <string name="msg_sdk_updated">Artifact SDK updated (%1$s / %2$s)</string>
+    <string name="msg_sdk_update_failed">Updating the SDK failed: %1$s</string>
+    <string name="msg_pack_icon_set">Icon pack icon set</string>
+    <string name="msg_pack_icon_failed">Setting the icon failed: %1$s</string>
+    <string name="msg_version_updated">Version updated to %1$s (next build v%2$d)</string>
+    <string name="msg_version_update_failed">Updating the version failed: %1$s</string>
+    <string name="msg_exported">Exported (%1$d KB)</string>
+    <string name="msg_export_failed">Export failed: %1$s</string>
+    <string name="msg_backup_exported">Project backup exported (%1$d KB)</string>
+    <string name="msg_backup_export_failed">Backup export failed: %1$s</string>
+    <string name="msg_backup_imported">Project imported; the backup contains no keystore, so builds are signed with a fresh key on this device (it can\'t overwrite installs made on the old device — uninstall the old artifact first)</string>
+    <string name="msg_backup_import_failed">Backup import failed: %1$s</string>
+
+    <!-- ===== Project form (create/edit shared) ===== -->
+    <string name="form_pack_name">Icon pack name</string>
+    <string name="form_version_name">Version name</string>
+    <string name="form_version_name_hint">Shown in the system\'s app info; version code and version name are two different things</string>
+    <string name="err_version_name_empty">Version name can\'t be empty</string>
+    <string name="err_version_name_too_long">Version name allows up to %1$d characters</string>
+    <string name="err_code_not_positive">Version code must be an integer greater than 0</string>
+    <string name="err_code_too_large">Version code is too large, max %1$d</string>
+    <string name="form_version_code_label">Version code for next build (blank = auto +1)</string>
+    <string name="form_version_code_warn_installed">Lower than the v%1$d installed on this device; an update install will be rejected by the system (uninstall first)</string>
+    <string name="form_version_code_warn_last_pack">Lower than the v%1$d of your last build; installing it back would also be rejected</string>
+    <string name="form_version_code_preview">Next build will use v%1$d; clear to return to auto-increment</string>
+    <string name="form_package_name_label">Package name (optional, auto-generated if blank)</string>
+    <string name="form_package_name_hint">Each icon pack needs a unique package name to coexist on the system; after changing it you must rebuild and install — the old package name stays on the device as a separate app (you can uninstall it yourself)</string>
+    <string name="form_sdk_section">Artifact SDK (optional, template defaults if blank)</string>
+    <string name="form_sdk_min_hint">Blank uses the template (%1$d); raising it blocks old devices that can\'t install</string>
+    <string name="form_sdk_target_hint">Blank uses the template; usually raised without touching minSdk</string>
+    <string name="err_min_sdk_range">minSdk must be between %1$d and %2$d</string>
+    <string name="err_target_sdk_range">targetSdk must be between %1$d and %2$d</string>
+    <string name="err_target_below_min">targetSdk can\'t be lower than minSdk</string>
+    <string name="form_show_in_drawer">Show in app drawer</string>
+    <string name="form_show_in_drawer_on">The icon pack shows up in the drawer; tapping it opens an enable hint</string>
+    <string name="form_show_in_drawer_off">Theme resource only; doesn\'t take a drawer slot</string>
+    <string name="form_icon_section">Icon (shown in the launcher)</string>
+    <string name="form_icon_section_optional">Icon (shown in the launcher), optional</string>
+    <string name="form_pick_image">Pick image</string>
+    <string name="common_clear">Clear</string>
+    <string name="form_sign_section">Signing</string>
+    <string name="form_import_keystore">Use an imported keystore</string>
+    <string name="form_import_keystore_on">Sign with your own key, so packs built on any device share one identity and can overwrite each other</string>
+    <string name="form_import_keystore_off">Default: the key is generated in this device\'s Keystore and can\'t be exported</string>
+    <string name="form_keystore_not_chosen">No keystore file chosen yet</string>
+    <string name="form_pick_keystore">Choose keystore file</string>
+    <string name="form_keystore_password">Keystore password</string>
+    <string name="form_key_alias">Key alias</string>
+    <string name="form_key_password">Key password (same as the keystore password if blank)</string>
+    <string name="form_signer_name">Signer name (optional)</string>
+    <string name="form_signer_name_hint">File name used by the v1 signing entry; leave blank for the default</string>
+    <string name="form_schemes">Signing schemes</string>
+    <string name="form_sign_needs_file">Imported keystores require choosing the keystore file first</string>
+    <string name="form_sign_needs_alias">Imported keystores require filling in the key alias</string>
+    <string name="form_sign_needs_scheme">Keep at least one signing scheme</string>
+
+    <!-- ===== Package name validation (core PackageNameRules → app resources) ===== -->
+    <string name="err_pkg_empty">Package name can\'t be empty</string>
+    <string name="err_pkg_too_long">Package name is too long, 255 characters max</string>
+    <string name="err_pkg_too_few_segments">A package name needs at least two segments, e.g. com.example.pack</string>
+    <string name="err_pkg_blank_segment">A package name can\'t start or end with a dot or contain consecutive dots</string>
+    <string name="err_pkg_segment_start">Each segment must start with a letter or underscore</string>
+    <string name="err_pkg_invalid_chars">Only ASCII letters, numbers, underscores and dots are allowed</string>
+    <string name="err_pkg_reserved">This package name is taken by the system or this app; pick another</string>
+
+    <string name="dialog_edit_pack_title">Edit icon pack</string>
+    <string name="dialog_create_pack_title">New icon pack</string>
+
+    <!-- ===== Repository localized errors (LocalizedException) ===== -->
+    <string name="err_package_taken">The package name is already used by project "%1$s"</string>
+    <string name="err_pack_not_found">Project not found: %1$s</string>
+    <string name="err_duplicate_source_copy">Failed to copy the original icon: %1$s</string>
+    <string name="err_sign_config_no_file">An imported keystore is selected, but no keystore file has been chosen</string>
+    <string name="err_sign_config_no_alias">An imported keystore is selected, but the key alias is not filled in</string>
+    <string name="err_min_sdk_below_floor">minSdk can\'t go below the template floor %1$d</string>
+    <string name="err_target_below_min_sdk">targetSdk can\'t be lower than minSdk</string>
+    <string name="err_target_sdk_below_floor">targetSdk can\'t go below the template floor %1$d</string>
+    <string name="err_target_sdk_too_large">targetSdk looks wrong (&gt;%1$d)</string>
+    <string name="err_min_sdk_too_large">minSdk looks wrong (&gt;%1$d)</string>
+    <string name="err_no_mappings">No mappings yet — nothing to build</string>
+    <string name="err_mapping_no_icon">Slot %1$d (%2$s) has no matching icon file</string>
+    <string name="err_sign_missing_file">An imported keystore is selected, but no keystore file was chosen; complete it in the project editor</string>
+    <string name="err_sign_missing_alias">An imported keystore is selected, but the key alias is missing; complete it in the project editor</string>
+    <string name="err_icon_missing">Icon not found: pack=%1$s slot=%2$d</string>
+    <string name="err_no_artifact">Nothing to export — build the pack first</string>
+    <string name="err_icons_pool_full">The icon pool is full (limit %1$d)</string>
+
+    <!-- ===== Mapping workbench (FR-03/FR-04) ===== -->
+    <string name="mapping_title_fallback">Mapping workbench</string>
+    <string name="cd_auto_match">Auto-match all</string>
+    <string name="mapping_import_album">Import photos</string>
+    <string name="mapping_import_zip">Import ZIP</string>
+    <string name="mapping_progress">Mapped %1$d / %2$d · Icons %3$d</string>
+    <string name="common_build">Build</string>
+    <string name="mapping_tab_apps">Apps %1$d</string>
+    <string name="mapping_tab_icons">Icons %1$d</string>
+    <string name="mapping_search_apps">Search apps</string>
+    <string name="mapping_add_target">Add mapping</string>
+    <string name="mapping_only_unmapped">Unmapped only</string>
+    <string name="mapping_all_mapped_done">All installed apps are mapped; to assign icons to apps not installed yet, tap "Add mapping"</string>
+    <string name="mapping_icon_count">%1$d icons</string>
+    <string name="mapping_unify_shape">Unify shape</string>
+    <string name="mapping_icons_empty">No icons yet.\nUse "Import photos" above to import one by one,\nor "Import ZIP" to bring in a whole icon pack (mappings are created automatically).</string>
+    <string name="mapping_app_unmapped">Unmapped</string>
+    <string name="cd_edit_target">Edit mapped package name</string>
+    <string name="dialog_edit_target_title">Edit mapping package name</string>
+    <string name="common_label_package_name">Package name</string>
+    <string name="mapping_pick_from_apps">Pick from installed apps</string>
+    <string name="mapping_resolve_target">Will map to %1$s</string>
+    <string name="mapping_target_not_installed">This app isn\'t installed: the mapping is written into the artifact first and calibrated to the real launch entry once the app is installed.</string>
+    <string name="mapping_retarget_warn">After saving, this mapping will point to %1$s and %2$s will have no mapping.</string>
+    <string name="mapping_next_step">Next</string>
+    <string name="mapping_pick_app">Pick an app</string>
+    <string name="common_search">Search</string>
+    <string name="mapping_no_match">No matching apps</string>
+    <string name="mapping_pick_icon_title">Pick an icon (%1$d)</string>
+    <string name="mapping_icons_pool_empty">The icon pool is empty. Import icons with the buttons above first.</string>
+    <string name="err_mapping_target_empty">Enter a package name, or tap "Pick from installed apps"</string>
+    <string name="err_mapping_target_not_installed">%1$s isn\'t installed on this device, so the launch entry can\'t be determined. Install the app first, or complete the entry as a component (e.g. %1$s/.MainActivity).</string>
+    <string name="err_activity_invalid">The activity class name is invalid; only ASCII letters, numbers, underscores and dots are allowed</string>
+
+    <!-- ===== Icon library (reverse lookup + unify shape dialog) ===== -->
+    <string name="mapping_unused_label">Unused</string>
+    <string name="mapping_targets_count">Used by %1$d apps</string>
+    <string name="mapping_detail_no_targets">Not assigned to any app</string>
+    <string name="mapping_detail_header">Used by %1$d apps:</string>
+    <string name="mapping_target_pending_install">%1$s · not installed; takes effect once installed</string>
+    <string name="cd_remove_target">Remove this mapping</string>
+    <string name="mapping_add_target_by_name">Add mapping (by package name)</string>
+    <string name="mapping_edit_icon">Edit icon</string>
+    <string name="common_delete_icon">Delete icon</string>
+    <string name="common_close">Close</string>
+    <string name="common_apply">Apply</string>
+    <string name="shape_batch_intro">Apply a unified shape and background color to all icons from their originals (this overwrites existing per-icon edits).</string>
+    <string name="shape_batch_shape">Shape</string>
+    <string name="shape_batch_bg">Background color</string>
+    <string name="shape_batch_bg_none">Default "None" — no background added, the icon itself only</string>
+    <string name="shape_batch_bg_filled">The color will be padded around the content</string>
+    <string name="shape_batch_overwrite">Also overwrite icons edited individually</string>
+    <string name="shape_batch_overwrite_hint">Skipped by default — protects the styles you tuned icon by icon</string>
+
+    <!-- ===== Mapping workbench messages (MappingViewModel) ===== -->
+    <string name="mapping_msg_separator">"; "</string>
+    <string name="mapping_automap_sep">", "</string>
+    <string name="msg_preset_activated">Preset icons enabled for %1$d newly installed apps</string>
+    <string name="msg_retarget_displaced">Mapping now points to %1$s (its previous mapping was replaced)</string>
+    <string name="msg_retarget">Mapping now points to %1$s</string>
+    <string name="msg_reassign_icon">%1$s\'s mapping now points to this icon (its previous mapping was replaced)</string>
+    <string name="msg_automatch_added">Auto-matching added %1$d mappings</string>
+    <string name="msg_automatch_none">No auto-matchable apps found</string>
+    <string name="msg_import_failed">Import failed: %1$s</string>
+    <string name="msg_shape_failed">Unifying shapes failed: %1$s</string>
+    <string name="msg_batch_none_applied">No icons to apply (%1$d were edited individually)</string>
+    <string name="msg_batch_applied_skipped">Applied to %1$d icons, skipped %2$d that were edited individually</string>
+    <string name="msg_batch_applied">Applied to %1$d icons</string>
+
+    <!-- Import result details -->
+    <string name="msg_import_pool_full">The icon pool is full (limit %1$d); nothing was imported</string>
+    <string name="msg_zip_no_images">No usable image files in the ZIP</string>
+    <string name="msg_import_none">No icons imported</string>
+    <string name="msg_imported_from_zip">%1$d icons imported from the ZIP</string>
+    <string name="msg_imported">%1$d icons imported</string>
+    <string name="msg_automap_manifest">In-pack mapping table %1$d</string>
+    <string name="msg_automap_package">Package name match %1$d</string>
+    <string name="msg_automap_detail">Automatically created %1$d mappings (%2$s)</string>
+    <string name="msg_automap_preset">%1$d more mappings target apps that aren\'t installed on this device; they take effect once installed</string>
+    <string name="msg_zip_no_appfilter">No appfilter.xml found in the pack — you can match manually by name</string>
+    <string name="msg_zip_no_auto_match">No apps were auto-matched; tap "Auto-match all" to match by name</string>
+    <string name="msg_import_merged">Merged %1$d multi-density duplicates</string>
+    <string name="msg_import_skipped">Skipped %1$d non-image files</string>
+    <string name="msg_import_truncated">%1$d more exceeded the slot limit and weren\'t imported</string>
+
+    <!-- ===== Icon editor (FR-05) ===== -->
+    <string name="editor_title">Edit icon</string>
+    <string name="editor_section_crop">Crop</string>
+    <string name="editor_crop_hint">Drag to move the viewport, pinch to zoom; what\'s inside the frame becomes the final (square) icon.</string>
+    <string name="editor_zoom_label">Zoom %1$s×</string>
+    <string name="editor_crop_reset">Reset crop</string>
+    <string name="editor_source_loading">Loading source image…</string>
+    <string name="editor_background_on">On: the color will be padded around the content</string>
+    <string name="editor_background_off">No background by default, the icon itself only</string>
+    <string name="editor_border_title">Border</string>
+    <string name="editor_border_on">On: outlined along the shape</string>
+    <string name="editor_border_off">No border by default</string>
+    <string name="editor_border_width">Width %1$d%% (of the icon side)</string>
+    <string name="editor_border_color">Color</string>
+    <string name="editor_scale_label">Content scale %1$d%%</string>
+    <string name="editor_scale_fill">" (fill)"</string>
+    <string name="editor_scale_hint">With no background/border, scaling down leaves transparent padding around the content.</string>
+    <string name="editor_overwrite_warn">This icon already has saved edits; saving again will overwrite them. "Restore" brings back the original.</string>
+    <string name="cd_editor_preview">Icon preview</string>
+    <string name="editor_preview_failed">Couldn\'t generate a preview</string>
+    <string name="editor_restore">Restore original</string>
+    <string name="editor_saving">Saving…</string>
+    <string name="editor_msg_missing">Icon not found or already deleted</string>
+    <string name="editor_msg_saved">Saved</string>
+    <string name="editor_msg_save_failed">Save failed: %1$s</string>
+    <string name="editor_msg_reset">Restored to the original</string>
+
+    <!-- ===== Build page (FR-06/07/08) ===== -->
+    <string name="build_title">Build icon pack</string>
+    <string name="build_intro">%1$d app mappings in total. Building produces an ADW/Nova-standard icon pack APK; enable it in a third-party launcher\'s icon style settings after install.</string>
+    <string name="build_icon_unset_title">The icon pack\'s own icon isn\'t set</string>
+    <string name="build_icon_unset_body">After install, the artifact shows the template\'s default icon on the home screen and app drawer. You can change it later via "Icon pack icon" in the project list.</string>
+    <string name="build_incomplete_title">%1$d mappings can\'t replace icons yet</string>
+    <string name="build_incomplete_body">These mappings target apps that aren\'t installed and have a package name but no activity class — the launcher drops the whole entry when it can\'t resolve it. Install the apps and reopen the mapping page to auto-calibrate, or complete them manually there as "package/.ActivityClass".</string>
+    <string name="build_button_running">Building…</string>
+    <string name="build_button_start">Start build</string>
+    <string name="build_step_prepare">Preparing template and signing identity</string>
+    <string name="build_step_manifest">Writing app info</string>
+    <string name="build_step_axml">Generating icon mappings</string>
+    <string name="build_step_icons">Processing icons</string>
+    <string name="build_step_zip">Assembling APK</string>
+    <string name="build_step_sign">Signing</string>
+    <string name="build_step_done">Done</string>
+    <string name="build_dv_title">One authorization needed before install</string>
+    <string name="build_dv_body">Google\'s app verification is active on this device. The icon pack is signed with the key on your phone, which isn\'t a verified developer, so install may be blocked. Complete the "advanced flow" once in Settings to continue installing — you only need to set it up once.</string>
+    <string name="build_dv_action">Go to Settings</string>
+    <string name="build_share_subject">Share icon pack</string>
+    <string name="build_fail_title">Build failed (%1$s)</string>
+    <string name="common_back">Back</string>
+    <string name="build_enable_hint">How to enable: Nova → Settings → Look &amp; feel → Icon style → Icon theme; Lawnchair → Home settings → General → Icon style; Apex → Settings → Theme → Icon pack.</string>
+    <string name="build_success_title">Build complete</string>
+    <string name="build_size_signer">Size %1$s · Signer %2$s</string>
+    <string name="build_version_line">Version %1$s (v%2$d)</string>
+    <string name="build_sdk_rewrite_note">" · SDK rewrite: %1$s"</string>
+    <string name="common_install">Install</string>
+    <string name="build_share">Share</string>
+    <string name="build_export">Export</string>
+    <string name="build_open_launcher">Open launcher</string>
+    <string name="msg_build_incomplete">Heads up: %1$d mappings target apps that aren\'t installed and lack an activity class; their icons won\'t be replaced on the home screen (see the notice card on this page).</string>
+    <string name="msg_build_settings_open_failed">Couldn\'t open Settings</string>
+    <string name="msg_build_install_intent_failed">Couldn\'t start the installer: %1$s</string>
+    <string name="msg_build_unknown_sources_manual">Please grant "install unknown apps" permission in Settings manually</string>
+    <string name="msg_build_share_failed">Share failed: %1$s</string>
+    <string name="msg_build_open_launcher_failed">Couldn\'t open the launcher</string>
+    <string name="msg_build_no_launcher">No third-party launcher found</string>
+</resources>

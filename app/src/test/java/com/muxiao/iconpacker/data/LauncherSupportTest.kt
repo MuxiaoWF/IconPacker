@@ -18,7 +18,7 @@ class LauncherSupportTest {
         // 曾据更新日志标 SUPPORTED，已降级——防止凭印象改回去。
         val profile = LauncherSupport.classify("com.coloros.launcher")
         assertEquals(LauncherSupport.SupportLevel.LIMITED, profile?.supportLevel)
-        assertTrue(profile?.guidance?.isNotEmpty() == true)
+        assertTrue(profile?.guidanceRes != null)
     }
 
     @Test
@@ -53,7 +53,7 @@ class LauncherSupportTest {
     fun `Nova launcher is supported without guidance`() {
         val profile = LauncherSupport.classify("com.teslacoilsw.launcher")
         assertEquals(LauncherSupport.SupportLevel.SUPPORTED, profile?.supportLevel)
-        assertNull(profile?.guidance)
+        assertNull(profile?.guidanceRes)
     }
 
     @Test

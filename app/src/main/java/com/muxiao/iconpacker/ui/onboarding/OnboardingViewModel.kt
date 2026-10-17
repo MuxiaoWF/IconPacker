@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.muxiao.iconpacker.data.LauncherCompat
 import com.muxiao.iconpacker.data.LauncherSupport
+import com.muxiao.iconpacker.ui.components.UiText
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,7 +19,7 @@ data class OnboardingUiState(
     val checking: Boolean = true,
     val currentLauncherLabel: String? = null,
     val currentSupportLevel: LauncherSupport.SupportLevel = LauncherSupport.SupportLevel.UNKNOWN,
-    val currentGuidance: String? = null,
+    val currentGuidance: UiText? = null,
     val availableLaunchers: List<LauncherCompat.LauncherInfo> = emptyList(),
 )
 
@@ -43,7 +44,7 @@ class OnboardingViewModel(
                 checking = false,
                 currentLauncherLabel = currentInfo?.label ?: current,
                 currentSupportLevel = launcherCompat.currentSupportLevel(),
-                currentGuidance = launcherCompat.currentGuidance(),
+                currentGuidance = launcherCompat.currentGuidanceRes()?.let { UiText(it) },
                 availableLaunchers = launchers,
             )
         }

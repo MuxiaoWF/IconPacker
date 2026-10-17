@@ -11,7 +11,10 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.muxiao.iconpacker.ServiceLocator
 import com.muxiao.iconpacker.core.packer.engine.IconProcessor
 import com.muxiao.iconpacker.core.packer.engine.IconStyle
+import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.data.PackRepository
+import com.muxiao.iconpacker.ui.components.UiText
+import com.muxiao.iconpacker.ui.components.uiMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,7 +36,7 @@ data class IconEditorUiState(
     val saving: Boolean = false,
     /** 当前是否已有编辑产物（保存将覆盖） */
     val hasEdit: Boolean = false,
-    val message: String? = null,
+    val message: UiText? = null,
     val finished: Boolean = false,
 )
 
@@ -68,7 +71,7 @@ class IconEditorViewModel(
         viewModelScope.launch {
             val icon = repository.getIcon(packId, slot)
             if (icon == null) {
-                _uiState.update { it.copy(loading = false, message = "图标不存在或已删除") }
+                _uiState.update { it.copy(loading = false, message = UiText(R.string.editor_msg_missing)) }
                 return@launch
             }
             originalPath = icon.sourcePath
@@ -106,10 +109,10 @@ class IconEditorViewModel(
             _uiState.update { it.copy(saving = true) }
             runCatching { repository.saveIconEdit(packId, slot, styleFlow.value) }
                 .onSuccess {
-                    _uiState.update { it.copy(saving = false, hasEdit = true, message = "已保存", finished = true) }
+                    _uiState.update { it.copy(saving = false, hasEdit = true, message = UiText(R.string.editor_msg_saved), finished = true) }
                 }
-                .onFailure {
-                    _uiState.update { it.copy(saving = false, message = "保存失败：${it.message}") }
+                .onFailure { failure ->
+                    _uiState.update { it.copy(saving = false, message = failure.uiMessage(R.string.editor_msg_save_failed)) }
                 }
         }
     }
@@ -117,7 +120,7 @@ class IconEditorViewModel(
     fun reset() {
         viewModelScope.launch {
             repository.clearIconEdit(packId, slot)
-            _uiState.update { it.copy(hasEdit = false, message = "已还原为原图") }
+            _uiState.update { it.copy(hasEdit = false, message = UiText(R.string.editor_msg_reset)) }
         }
     }
 

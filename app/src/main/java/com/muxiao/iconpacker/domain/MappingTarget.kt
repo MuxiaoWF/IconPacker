@@ -1,5 +1,7 @@
 package com.muxiao.iconpacker.domain
 
+import androidx.annotation.StringRes
+import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.core.packer.engine.IconPackManifest
 import com.muxiao.iconpacker.core.packer.engine.PackageNameRules
 
@@ -40,8 +42,13 @@ object MappingTarget {
             val installed: Boolean,
         ) : Resolution
 
-        /** 输入不可用；[message] 直接面向用户 */
-        data class Invalid(val message: String) : Resolution
+        /** 输入不可用；文案为资源 id + 参数，UI 层按当前语言解析（见 UiText.asString） */
+        data class Invalid(
+            @StringRes val messageRes: Int,
+            val args: List<Any> = emptyList(),
+        ) : Resolution {
+            constructor(@StringRes messageRes: Int, vararg args: Any) : this(messageRes, args.toList())
+        }
     }
 
     private const val COMPONENT_INFO = "ComponentInfo"
@@ -53,13 +60,13 @@ object MappingTarget {
      */
     fun resolve(input: String, installed: List<ImportBinder.AppItem>): Resolution {
         val raw = unwrap(input)
-        if (raw.isEmpty()) return Resolution.Invalid("请输入包名，或点「从应用列表选择」")
+        if (raw.isEmpty()) return Resolution.Invalid(R.string.err_mapping_target_empty)
 
         val slash = raw.indexOf('/')
         val packageName = (if (slash < 0) raw else raw.substring(0, slash)).trim()
         val typedActivity = if (slash < 0) "" else raw.substring(slash + 1).trim()
 
-        PackageNameRules.validate(packageName)?.let { return Resolution.Invalid(it.message) }
+        PackageNameRules.validate(packageName)?.let { return Resolution.Invalid(it.messageRes()) }
 
         // 已安装 → 用设备上的真实启动组件（见类文档第 1 条）
         installed.firstOrNull { it.packageName == packageName }?.let {
@@ -68,12 +75,12 @@ object MappingTarget {
 
         if (typedActivity.isEmpty()) {
             return Resolution.Invalid(
-                "本机没有安装 $packageName，无法确定它的启动入口。" +
-                    "可以先安装该应用，或补全成组件形式（如 $packageName/.MainActivity）。",
+                R.string.err_mapping_target_not_installed,
+                packageName,
             )
         }
         if (!isValidActivity(typedActivity, packageName)) {
-            return Resolution.Invalid("活动类名不合法，只能使用英文字母、数字、下划线和点")
+            return Resolution.Invalid(R.string.err_activity_invalid)
         }
 
         return Resolution.Resolved(

@@ -55,10 +55,12 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.data.AppInfoProvider
 import com.muxiao.iconpacker.data.IconAssetEntity
 import com.muxiao.iconpacker.domain.ImportBinder
@@ -67,6 +69,7 @@ import com.muxiao.iconpacker.ui.IconImage
 import com.muxiao.iconpacker.ui.components.AppScaffold
 import com.muxiao.iconpacker.ui.components.EmptyState
 import com.muxiao.iconpacker.ui.components.ScrollableDialogContent
+import com.muxiao.iconpacker.ui.components.asString
 import com.muxiao.iconpacker.ui.theme.IconSize
 import com.muxiao.iconpacker.ui.theme.Spacing
 import com.muxiao.iconpacker.ui.toImageBitmap
@@ -129,20 +132,21 @@ fun MappingScreen(
         uri?.let { viewModel.importFromZip(it) }
     }
 
+    val msgSeparator = stringResource(R.string.mapping_msg_separator)
     LaunchedEffect(state.message) {
-        state.message?.let {
-            snackbarHostState.showSnackbar(it)
+        state.message?.takeIf { it.isNotEmpty() }?.let {
+            snackbarHostState.showSnackbar(it.map { part -> part.asString(context) }.joinToString(msgSeparator))
             viewModel.consumeMessage()
         }
     }
 
     AppScaffold(
-        title = state.packName.ifBlank { "映射工作台" },
+        title = state.packName.ifBlank { stringResource(R.string.mapping_title_fallback) },
         snackbarHostState = snackbarHostState,
         onBack = onBack,
         actions = {
             IconButton(onClick = viewModel::autoMatch) {
-                Icon(Icons.Default.Refresh, contentDescription = "一键自动匹配")
+                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.cd_auto_match))
             }
         },
     ) { innerPadding ->
@@ -159,11 +163,11 @@ fun MappingScreen(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                         )
                     },
-                    label = { Text("相册导入") },
+                    label = { Text(stringResource(R.string.mapping_import_album)) },
                 )
                 AssistChip(
                     onClick = { zipPicker.launch(arrayOf("application/zip")) },
-                    label = { Text("ZIP 导入") },
+                    label = { Text(stringResource(R.string.mapping_import_zip)) },
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 if (state.importing) {
@@ -178,12 +182,17 @@ fun MappingScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "已映射 ${state.mappedCount} / ${state.apps.size} · 图标 ${state.icons.size}",
+                    text = stringResource(
+                        R.string.mapping_progress,
+                        state.mappedCount,
+                        state.apps.size,
+                        state.icons.size,
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 Button(onClick = onBuild, enabled = state.mappedCount > 0) {
-                    Text("打包")
+                    Text(stringResource(R.string.common_build))
                 }
             }
 
@@ -191,12 +200,12 @@ fun MappingScreen(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("应用 ${state.apps.size}") },
+                    text = { Text(stringResource(R.string.mapping_tab_apps, state.apps.size)) },
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("图标 ${state.icons.size}") },
+                    text = { Text(stringResource(R.string.mapping_tab_icons, state.icons.size)) },
                 )
             }
 
@@ -211,14 +220,14 @@ fun MappingScreen(
                         OutlinedTextField(
                             value = state.query,
                             onValueChange = viewModel::setQuery,
-                            label = { Text("搜索应用") },
+                            label = { Text(stringResource(R.string.mapping_search_apps)) },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                         )
                         // 映射的目标不必来自列表：图标包里可能有本机没装的应用，
                         // 也可以手动把一个包名指到自己想要的图标上
                         TextButton(onClick = { targetDraft = TargetDraft("", null) }) {
-                            Text("添加映射")
+                            Text(stringResource(R.string.mapping_add_target))
                         }
                     }
                     Row(
@@ -228,11 +237,11 @@ fun MappingScreen(
                         FilterChip(
                             selected = state.onlyUnmapped,
                             onClick = { viewModel.setOnlyUnmapped(!state.onlyUnmapped) },
-                            label = { Text("只看未映射") },
+                            label = { Text(stringResource(R.string.mapping_only_unmapped)) },
                         )
                         if (state.onlyUnmapped && state.visibleApps.isEmpty()) {
                             Text(
-                                text = "已安装应用全部映射完毕；给未安装的应用指图标可点「添加映射」",
+                                text = stringResource(R.string.mapping_all_mapped_done),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.align(Alignment.CenterVertically),
@@ -268,21 +277,20 @@ fun MappingScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = "共 ${state.icons.size} 个图标",
+                            text = stringResource(R.string.mapping_icon_count, state.icons.size),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         OutlinedButton(
                             onClick = { showShapeBatch = true },
                             enabled = state.icons.isNotEmpty() && !state.importing,
-                        ) { Text("统一形状") }
+                        ) { Text(stringResource(R.string.mapping_unify_shape)) }
                     }
                     if (state.icons.isEmpty() && !state.importing) {
                         // 空状态引导：新项目最容易在"导入"这一步停顿——把两条导入通道
                         // 的入口明示在库面板里（顶部 chips 本就有，这里只是再指一次路）
                         EmptyState(
-                            message = "还没有图标。\n用上方「相册导入」逐张导入，\n" +
-                                "或「ZIP 导入」整包导入图标包（自动建映射）。",
+                            message = stringResource(R.string.mapping_icons_empty),
                         )
                     } else {
                         IconLibraryTab(
@@ -411,7 +419,7 @@ private fun AppRowItem(
                         Spacer(modifier = Modifier.size(Spacing.xs))
                         Icon(
                             imageVector = Icons.Default.Edit,
-                            contentDescription = "编辑映射的包名",
+                            contentDescription = stringResource(R.string.cd_edit_target),
                             modifier = Modifier.size(14.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -434,7 +442,7 @@ private fun AppRowItem(
                     )
                 } else {
                     Text(
-                        text = "未映射",
+                        text = stringResource(R.string.mapping_app_unmapped),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -501,13 +509,21 @@ private fun MappingTargetDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (draft.from == null) "添加映射" else "编辑映射包名") },
+        title = {
+            Text(
+                text = if (draft.from == null) {
+                    stringResource(R.string.mapping_add_target)
+                } else {
+                    stringResource(R.string.dialog_edit_target_title)
+                },
+            )
+        },
         text = {
             ScrollableDialogContent {
                 OutlinedTextField(
                     value = input,
                     onValueChange = { input = it },
-                    label = { Text("包名") },
+                    label = { Text(stringResource(R.string.common_label_package_name)) },
                     placeholder = { Text("com.example.app") },
                     singleLine = true,
                     isError = resolution is MappingTarget.Resolution.Invalid,
@@ -517,24 +533,24 @@ private fun MappingTargetDialog(
                 TextButton(
                     onClick = { pickingFromList = true },
                     enabled = apps.isNotEmpty(),
-                ) { Text("从应用列表选择") }
+                ) { Text(stringResource(R.string.mapping_pick_from_apps)) }
 
                 when (resolution) {
                     is MappingTarget.Resolution.Invalid -> Text(
-                        text = resolution.message,
+                        text = stringResource(resolution.messageRes, *resolution.args.toTypedArray()),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.error,
                     )
 
                     is MappingTarget.Resolution.Resolved -> Column {
                         Text(
-                            text = "将映射到 ${resolution.component}",
+                            text = stringResource(R.string.mapping_resolve_target, resolution.component),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         if (!resolution.installed) {
                             Text(
-                                text = "该应用尚未安装：映射会先写进产物，装上后自动校准启动入口。",
+                                text = stringResource(R.string.mapping_target_not_installed),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -542,8 +558,11 @@ private fun MappingTargetDialog(
                         val from = draft.from
                         if (from != null && from.component != resolution.component) {
                             Text(
-                                text = "保存后这条映射改指向 ${resolution.packageName}，" +
-                                    "${from.packageName} 不再有映射。",
+                                text = stringResource(
+                                    R.string.mapping_retarget_warn,
+                                    resolution.packageName,
+                                    from.packageName,
+                                ),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.error,
                             )
@@ -557,9 +576,11 @@ private fun MappingTargetDialog(
             TextButton(
                 onClick = { resolved?.let { onConfirm(it.component) } },
                 enabled = resolved != null,
-            ) { Text("下一步") }
+            ) { Text(stringResource(R.string.mapping_next_step)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+        },
     )
 
     if (pickingFromList) {
@@ -597,20 +618,20 @@ private fun InstalledAppPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("选择应用") },
+        title = { Text(stringResource(R.string.mapping_pick_app)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    label = { Text("搜索") },
+                    label = { Text(stringResource(R.string.common_search)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(modifier = Modifier.size(Spacing.sm))
                 if (filtered.isEmpty()) {
                     Text(
-                        text = "没有匹配的应用",
+                        text = stringResource(R.string.mapping_no_match),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = Spacing.md),
@@ -645,7 +666,9 @@ private fun InstalledAppPickerDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+        },
     )
 }
 
@@ -660,7 +683,7 @@ private fun IconPickerDialog(
         onDismissRequest = onDismiss,
         title = {
             Column {
-                Text("选择图标（${icons.size}）")
+                Text(stringResource(R.string.mapping_pick_icon_title, icons.size))
                 // 显示目标，是为了让"改包名"的第二步不至于失去上下文
                 Text(
                     text = targetPackage,
@@ -671,7 +694,7 @@ private fun IconPickerDialog(
         },
         text = {
             if (icons.isEmpty()) {
-                Text("图标池是空的，请先通过上方按钮导入图标。")
+                Text(stringResource(R.string.mapping_icons_pool_empty))
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(88.dp),
@@ -700,7 +723,7 @@ private fun IconPickerDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
     )
 }
 
