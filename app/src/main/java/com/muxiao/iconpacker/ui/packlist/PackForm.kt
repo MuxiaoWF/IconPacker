@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
@@ -21,7 +21,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.muxiao.iconpacker.core.packer.engine.MIN_SDK_FLOOR
 import com.muxiao.iconpacker.core.packer.engine.PackageNameRules
 import com.muxiao.iconpacker.core.packer.engine.TemplateInfo
@@ -29,6 +28,9 @@ import com.muxiao.iconpacker.data.AppSettings
 import com.muxiao.iconpacker.data.PackEntity
 import com.muxiao.iconpacker.data.PackSignConfig
 import com.muxiao.iconpacker.domain.PackVersionRules
+import com.muxiao.iconpacker.ui.components.SectionHeader
+import com.muxiao.iconpacker.ui.components.ToggleInfoRow
+import com.muxiao.iconpacker.ui.theme.Spacing
 
 /** SDK 输入区间的上层只防误填（如把年份写进去），无引擎语义 */
 private const val MAX_SDK = 99
@@ -192,6 +194,9 @@ fun PackForm.toDraft(): PackDraft = PackDraft(
  * 图标区走回调（编辑流程的图标是即时落库操作，无法贴进"保存才写库"的模型）；
  * 签名区是纯表单字段。所有校验即时反馈，[PackForm.isValid] 控制保存按钮。
  *
+ * 布局：统一 Column(spacedBy)，字段一律 fillMaxWidth——TextField 的默认最小
+ * 宽度是"按内容伸缩"，不铺满会和周边控件错位。
+ *
  * @param installedVersionCode 设备上已安装产物的版本号（编辑对话框用于降级警告）
  * @param currentPackVersionCode 项目当前版本号（编辑对话框用于"低于上次打包"警告）
  */
@@ -207,14 +212,14 @@ fun PackFormFields(
     installedVersionCode: Long? = null,
     currentPackVersionCode: Int? = null,
 ) {
-    Column(modifier = modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         OutlinedTextField(
             value = form.name,
             onValueChange = { form.name = it },
             label = { Text("图标包名称") },
             singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(modifier = Modifier.height(16.dp))
         OutlinedTextField(
             value = form.versionName,
             onValueChange = { form.versionName = it },
@@ -228,14 +233,13 @@ fun PackFormFields(
                     style = MaterialTheme.typography.labelSmall,
                 )
             },
+            modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(modifier = Modifier.height(8.dp))
         VersionCodeField(
             form = form,
             installedVersionCode = installedVersionCode,
             currentPackVersionCode = currentPackVersionCode,
         )
-        Spacer(modifier = Modifier.height(16.dp))
         OutlinedTextField(
             value = form.packageName,
             onValueChange = { form.packageName = it },
@@ -250,13 +254,16 @@ fun PackFormFields(
                     style = MaterialTheme.typography.labelSmall,
                 )
             },
+            modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = "产物 SDK（可选，留空沿用模板）",
             style = MaterialTheme.typography.bodySmall,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
             OutlinedTextField(
                 value = form.minSdkInput,
                 onValueChange = { form.minSdkInput = it.filter(Char::isDigit).take(3) },
@@ -270,6 +277,7 @@ fun PackFormFields(
                         style = MaterialTheme.typography.labelSmall,
                     )
                 },
+                modifier = Modifier.weight(1f),
             )
             OutlinedTextField(
                 value = form.targetSdkInput,
@@ -284,103 +292,84 @@ fun PackFormFields(
                         style = MaterialTheme.typography.labelSmall,
                     )
                 },
+                modifier = Modifier.weight(1f),
             )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(
-                checked = form.showInDrawer,
-                onCheckedChange = { form.showInDrawer = it },
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-                Text(text = "在应用抽屉显示", style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    text = if (form.showInDrawer) {
-                        "抽屉里能看到这个图标包，点开是启用提示"
-                    } else {
-                        "只作为主题资源，不占抽屉位置"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+        ToggleInfoRow(
+            title = "在应用抽屉显示",
+            subtitle = if (form.showInDrawer) {
+                "抽屉里能看到这个图标包，点开是启用提示"
+            } else {
+                "只作为主题资源，不占抽屉位置"
+            },
+            leading = {
+                Checkbox(
+                    checked = form.showInDrawer,
+                    onCheckedChange = { form.showInDrawer = it },
                 )
-            }
-        }
+            },
+        )
 
         if (iconContent != null) {
-            Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "图标（在启动器里显示）" + if (onPickIcon == null) "，可选" else "",
                 style = MaterialTheme.typography.bodySmall,
             )
-            Spacer(modifier = Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 iconContent()
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(Spacing.md))
                 if (onPickIcon != null) TextButton(onClick = onPickIcon) { Text("选择图片") }
                 if (onClearIcon != null) TextButton(onClick = onClearIcon) { Text("清除") }
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
-        Text(
-            text = "签名设置",
-            style = MaterialTheme.typography.titleSmall,
+        SectionHeader("签名设置")
+        ToggleInfoRow(
+            title = "使用导入的密钥库",
+            subtitle = if (form.importedKey) {
+                "用你自己的密钥签名，所有设备产出的图标包可用同一身份互相覆盖"
+            } else {
+                "默认：密钥在本机 Keystore 生成，不可导出"
+            },
+            leading = {
+                Switch(checked = form.importedKey, onCheckedChange = { form.importedKey = it })
+            },
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Switch(checked = form.importedKey, onCheckedChange = { form.importedKey = it })
-            Spacer(modifier = Modifier.width(8.dp))
-            Column {
-                Text(text = "使用导入的密钥库", style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    text = if (form.importedKey) {
-                        "用你自己的密钥签名，所有设备产出的图标包可用同一身份互相覆盖"
-                    } else {
-                        "默认：密钥在本机 Keystore 生成，不可导出"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
         if (form.importedKey) {
-            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = form.keystorePath.ifBlank { "尚未选择密钥库文件" },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Row {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 TextButton(onClick = onPickKeystore) { Text("选择密钥库文件") }
                 if (form.keystorePath.isNotBlank()) {
                     TextButton(onClick = onClearKeystore) { Text("清除") }
                 }
             }
-            Spacer(modifier = Modifier.height(4.dp))
             OutlinedTextField(
                 value = form.keystorePassword,
                 onValueChange = { form.keystorePassword = it },
                 label = { Text("密钥库密码") },
                 singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(modifier = Modifier.height(4.dp))
             OutlinedTextField(
                 value = form.keystoreAlias,
                 onValueChange = { form.keystoreAlias = it },
                 label = { Text("密钥别名") },
                 singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(modifier = Modifier.height(4.dp))
             OutlinedTextField(
                 value = form.keyPassword,
                 onValueChange = { form.keyPassword = it },
                 label = { Text("私钥密码（留空则与密钥库密码相同）") },
                 singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
-        Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
             value = form.signerName,
             onValueChange = { form.signerName = it },
@@ -392,10 +381,10 @@ fun PackFormFields(
                     style = MaterialTheme.typography.labelSmall,
                 )
             },
+            modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(modifier = Modifier.height(8.dp))
         Text(text = "签名方案", style = MaterialTheme.typography.bodySmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             FilterChip(
                 selected = form.schemeV1,
                 onClick = { form.schemeV1 = !form.schemeV1 },
@@ -414,7 +403,6 @@ fun PackFormFields(
         }
         val signIssue = form.signIssue
         if (signIssue != null) {
-            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = signIssue,
                 style = MaterialTheme.typography.labelSmall,

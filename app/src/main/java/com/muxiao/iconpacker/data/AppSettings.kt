@@ -30,6 +30,8 @@ class AppSettings(context: Context) {
         val schemeV3: Boolean = true,
         /** 导出产物建议文件名模板；占位符 {name}/{version}/{code}，非法字符会被过滤 */
         val artifactTemplate: String = DEFAULT_ARTIFACT_TEMPLATE,
+        /** 外观模式：跟随系统 / 浅色 / 深色（ThemeMode 序列化串） */
+        val themeMode: ThemeMode = ThemeMode.FollowSystem,
     )
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -53,6 +55,8 @@ class AppSettings(context: Context) {
 
     fun setArtifactTemplate(value: String) = edit { it.putString(KEY_ARTIFACT_TEMPLATE, value.trim()) }
 
+    fun setThemeMode(value: ThemeMode) = edit { it.putString(KEY_THEME_MODE, value.name) }
+
     private inline fun edit(block: (android.content.SharedPreferences.Editor) -> Unit) {
         prefs.edit().also(block).apply()
     }
@@ -65,6 +69,7 @@ class AppSettings(context: Context) {
         schemeV3 = prefs.getBoolean(KEY_SCHEME_V3, true),
         artifactTemplate = prefs.getString(KEY_ARTIFACT_TEMPLATE, DEFAULT_ARTIFACT_TEMPLATE)
             .orEmpty().ifBlank { DEFAULT_ARTIFACT_TEMPLATE },
+        themeMode = ThemeMode.from(prefs.getString(KEY_THEME_MODE, null)),
     )
 
     companion object {
@@ -79,5 +84,6 @@ class AppSettings(context: Context) {
         private const val KEY_SCHEME_V2 = "default_scheme_v2"
         private const val KEY_SCHEME_V3 = "default_scheme_v3"
         private const val KEY_ARTIFACT_TEMPLATE = "artifact_template"
+        private const val KEY_THEME_MODE = "theme_mode"
     }
 }

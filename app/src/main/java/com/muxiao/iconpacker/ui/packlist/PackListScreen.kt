@@ -1,11 +1,10 @@
 package com.muxiao.iconpacker.ui.packlist
 
-import androidx.activity.compose.rememberLauncherForActivityResult
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,23 +13,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -41,12 +31,9 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,6 +44,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -65,6 +54,13 @@ import com.muxiao.iconpacker.data.IconFileStore
 import com.muxiao.iconpacker.data.PackEntity
 import com.muxiao.iconpacker.data.toSignConfig
 import com.muxiao.iconpacker.domain.PackVersionRules
+import com.muxiao.iconpacker.ui.IconImage
+import com.muxiao.iconpacker.ui.sampleSizeFor
+import com.muxiao.iconpacker.ui.components.AppScaffold
+import com.muxiao.iconpacker.ui.components.EmptyState
+import com.muxiao.iconpacker.ui.components.ScrollableDialogContent
+import com.muxiao.iconpacker.ui.theme.IconSize
+import com.muxiao.iconpacker.ui.theme.Spacing
 
 /**
  * 项目列表（FR-02）+ 产物管理（FR-08）。
@@ -179,26 +175,22 @@ fun PackListScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("我的图标包") },
-                actions = {
-                    TextButton(
-                        onClick = {
-                            backupImportLauncher.launch(
-                                arrayOf("application/zip", "application/x-zip-compressed"),
-                            )
-                        },
-                        enabled = !state.importingBackup,
-                    ) { Text(if (state.importingBackup) "导入中" else "导入") }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "设置")
-                    }
+    AppScaffold(
+        title = "我的图标包",
+        snackbarHostState = snackbarHostState,
+        actions = {
+            TextButton(
+                onClick = {
+                    backupImportLauncher.launch(
+                        arrayOf("application/zip", "application/x-zip-compressed"),
+                    )
                 },
-            )
+                enabled = !state.importingBackup,
+            ) { Text(if (state.importingBackup) "导入中" else "导入") }
+            IconButton(onClick = onOpenSettings) {
+                Icon(Icons.Default.Settings, contentDescription = "设置")
+            }
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(onClick = { createForm = PackForm(defaults = settings) }) {
                 Icon(Icons.Default.Add, contentDescription = "新建图标包")
@@ -206,20 +198,16 @@ fun PackListScreen(
         },
     ) { innerPadding ->
         if (state.packs.isEmpty() && !state.loading) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(innerPadding).padding(32.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "还没有图标包。\n点击右下角按钮创建第一个，然后导入图标、映射到应用、一键打包。",
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
+            EmptyState(
+                message = "还没有图标包。\n点击右下角按钮创建第一个，" +
+                    "然后导入图标、映射到应用、一键打包。",
+                modifier = Modifier.padding(innerPadding),
+            )
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(innerPadding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 items(state.packs, key = { it.id }) { pack ->
                     PackItem(
@@ -347,6 +335,9 @@ fun PackListScreen(
 
 /**
  * 项目卡片。编辑是"→ 编辑对话框"的单入口；复制/导出/删除是即时操作。
+ *
+ * 行内只保留一个"更多"入口，编辑/导出/复制/备份/删除全部收进溢出菜单：
+ * 窄屏四连 IconButton 会把标题列挤到不可读；图标缩略图前置，扫一眼即可辨认项目。
  */
 @Composable
 private fun PackItem(
@@ -363,13 +354,21 @@ private fun PackItem(
     onDelete: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
-    Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+    Card(onClick = onClick) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(Spacing.lg),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            PackIconThumbnail(path = pack.iconPath)
+            Spacer(modifier = Modifier.size(Spacing.md))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = pack.name, style = MaterialTheme.typography.titleMedium)
+                // 长名称截断为两行：名称后仍能一眼看到状态行
+                Text(
+                    text = pack.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 // 版本名（用户可编辑）与版本号分开摆：前者给人看，后者决定能否覆盖安装
                 Text(
                     text = "版本 ${pack.versionName}（v${pack.versionCode}）· " + when (status) {
@@ -382,6 +381,8 @@ private fun PackItem(
                         PackStatus.DIRTY -> MaterialTheme.colorScheme.error
                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                     },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 // 用户显式指定过下次版本号时如实预告，否则只能打包后才知道"这次打的到底是 v 几"
                 if (pack.nextVersionCode != null) {
@@ -402,42 +403,59 @@ private fun PackItem(
                     text = pack.packageName,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "编辑名称与图标")
-            }
             if (exporting || backing) {
-                CircularProgressIndicator(modifier = Modifier.padding(8.dp))
+                CircularProgressIndicator(modifier = Modifier.size(IconSize.progressSmall))
             } else {
-                IconButton(onClick = onExport, enabled = pack.lastPackedAt != null) {
-                    Icon(Icons.Default.Share, contentDescription = "导出产物")
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "更多操作")
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("编辑名称与图标") },
+                            onClick = {
+                                menuExpanded = false
+                                onEdit()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("导出产物") },
+                            onClick = {
+                                menuExpanded = false
+                                onExport()
+                            },
+                            enabled = pack.lastPackedAt != null,
+                        )
+                        DropdownMenuItem(
+                            text = { Text("复制项目") },
+                            onClick = {
+                                menuExpanded = false
+                                onDuplicate()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("导出项目备份（ZIP，不含密钥库）") },
+                            onClick = {
+                                menuExpanded = false
+                                onExportBackup()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("删除", color = MaterialTheme.colorScheme.error) },
+                            onClick = {
+                                menuExpanded = false
+                                onDelete()
+                            },
+                        )
+                    }
                 }
-            }
-            // 二级操作收进溢出菜单：图标池会随项目数增长，一级按钮不宜再排密
-            Box {
-                IconButton(onClick = { menuExpanded = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "更多操作")
-                }
-                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                    DropdownMenuItem(
-                        text = { Text("复制项目") },
-                        onClick = {
-                            menuExpanded = false
-                            onDuplicate()
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text("导出项目备份（ZIP，不含密钥库）") },
-                        onClick = {
-                            menuExpanded = false
-                            onExportBackup()
-                        },
-                    )
-                }
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "删除")
             }
         }
     }
@@ -464,11 +482,7 @@ private fun EditPackDialog(
         onDismissRequest = onDismiss,
         title = { Text("编辑图标包") },
         text = {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .heightIn(max = 460.dp),
-            ) {
+            ScrollableDialogContent {
                 PackFormFields(
                     form = form,
                     installedVersionCode = installedVersionCode,
@@ -490,44 +504,68 @@ private fun EditPackDialog(
 
 /**
  * 启动器图标缩略图；未设置时显示占位提示。
- * 支持两种来源：已落库的文件路径（编辑时）或新建时临时选中的 [Uri]（尚未落库）。
+ * 支持两种来源：已落库的文件路径（走 [IconImage] 采样解码）或
+ * 新建时临时选中的 [Uri]（尚未落库，就地按缩略图尺寸采样解码）。
  */
 @Composable
 private fun PackIconThumbnail(path: String? = null, uri: Uri? = null) {
     val context = LocalContext.current
+    val maxPx = with(LocalDensity.current) { IconSize.thumb.roundToPx() }
     val bitmap = remember(path, uri) {
         when {
+            path != null -> null
             uri != null -> runCatching {
+                // 两段读取：先只读尺寸定采样率，再按采样解码，避免整图入内存
+                val bounds = android.graphics.BitmapFactory.Options()
+                    .apply { inJustDecodeBounds = true }
                 context.contentResolver.openInputStream(uri)?.use {
-                    android.graphics.BitmapFactory.decodeStream(it)
+                    android.graphics.BitmapFactory.decodeStream(it, null, bounds)
+                }
+                if (bounds.outWidth <= 0) {
+                    null
+                } else {
+                    context.contentResolver.openInputStream(uri)?.use {
+                        android.graphics.BitmapFactory.decodeStream(
+                            it,
+                            null,
+                            android.graphics.BitmapFactory.Options().apply {
+                                inSampleSize = sampleSizeFor(bounds.outWidth, bounds.outHeight, maxPx)
+                            },
+                        )
+                    }
                 }
             }.getOrNull()
-            path != null -> android.graphics.BitmapFactory.decodeFile(path)
             else -> null
         }
     }
-    if (bitmap != null) {
-        Image(
+    when {
+        path != null -> IconImage(
+            path = path,
+            contentDescription = "图标包图标",
+            modifier = Modifier.size(IconSize.thumb),
+        )
+
+        bitmap != null -> Image(
             bitmap = bitmap.asImageBitmap(),
             contentDescription = "图标包图标",
-            modifier = Modifier.size(48.dp),
+            modifier = Modifier.size(IconSize.thumb),
         )
-        return
-    }
-    Box(
-        modifier = Modifier
-            .size(48.dp)
-            .background(
-                MaterialTheme.colorScheme.surfaceVariant,
-                MaterialTheme.shapes.small,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "未设",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+
+        else -> Box(
+            modifier = Modifier
+                .size(IconSize.thumb)
+                .background(
+                    MaterialTheme.colorScheme.surfaceVariant,
+                    MaterialTheme.shapes.small,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "未设",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -550,11 +588,7 @@ private fun CreatePackDialog(
         onDismissRequest = onDismiss,
         title = { Text("新建图标包") },
         text = {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .heightIn(max = 460.dp),
-            ) {
+            ScrollableDialogContent {
                 PackFormFields(
                     form = form,
                     onPickKeystore = onPickKeystore,

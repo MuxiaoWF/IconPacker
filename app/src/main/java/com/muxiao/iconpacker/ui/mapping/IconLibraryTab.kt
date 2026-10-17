@@ -1,27 +1,16 @@
 package com.muxiao.iconpacker.ui.mapping
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -41,13 +30,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.muxiao.iconpacker.core.packer.engine.IconShape
 import com.muxiao.iconpacker.core.packer.engine.IconStyle
 import com.muxiao.iconpacker.data.IconAssetEntity
 import com.muxiao.iconpacker.ui.IconImage
+import com.muxiao.iconpacker.ui.components.ColorSwatch
+import com.muxiao.iconpacker.ui.components.ColorSwatchRow
+import com.muxiao.iconpacker.ui.components.SectionHeader
+import com.muxiao.iconpacker.ui.components.ScrollableDialogContent
+import com.muxiao.iconpacker.ui.components.ToggleInfoRow
+import com.muxiao.iconpacker.ui.components.iconShapeLabel
+import com.muxiao.iconpacker.ui.theme.IconSize
+import com.muxiao.iconpacker.ui.theme.Spacing
 
 /**
  * 图标库 Tab：网格展示全部已导入图标，每个图标标注"供哪个 App 使用"（FR-04 反查）。
@@ -67,28 +62,23 @@ fun IconLibraryTab(
 ) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(96.dp),
-        contentPadding = PaddingValues(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(Spacing.lg),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         items(icons.size, key = { index -> icons[index].id }) { index ->
             val icon = icons[index]
             val targets = iconTargets[icon.slot].orEmpty()
             val anyInstalled = targets.any { it.installed }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(
+                // 图标整体落在固定网格单元中居中：大图不出界，小图不贴边
+                IconImage(
+                    path = icon.editedPath ?: icon.sourcePath,
+                    contentDescription = icon.originalName,
                     modifier = Modifier
-                        .size(72.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .size(IconSize.grid)
                         .clickable { onIconClick(icon) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    IconImage(
-                        path = icon.editedPath ?: icon.sourcePath,
-                        contentDescription = icon.originalName,
-                        modifier = Modifier.size(72.dp),
-                    )
-                }
+                )
                 Text(
                     text = if (targets.isEmpty()) "未使用" else "供 ${targets.size} 个 App",
                     style = MaterialTheme.typography.labelSmall,
@@ -131,12 +121,7 @@ fun IconDetailDialog(
         onDismissRequest = onDismiss,
         title = { Text(icon.originalName) },
         text = {
-            Column(
-                modifier = Modifier
-                    .heightIn(max = 360.dp)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                Spacer(modifier = Modifier.height(8.dp))
+            ScrollableDialogContent {
                 Text(
                     text = if (targets.isEmpty()) "未分配给任何应用" else "供 ${targets.size} 个应用使用：",
                     style = MaterialTheme.typography.bodyMedium,
@@ -146,7 +131,7 @@ fun IconDetailDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onEditTarget(app) }
-                            .padding(vertical = 4.dp),
+                            .padding(vertical = Spacing.xs),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
@@ -182,7 +167,6 @@ fun IconDetailDialog(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
                 TextButton(onClick = onAddTarget) { Text("添加映射（指定包名）") }
             }
         },
@@ -217,39 +201,27 @@ fun ShapeBatchDialog(
         onDismissRequest = onDismiss,
         title = { Text("统一形状") },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            ScrollableDialogContent(contentSpacing = Spacing.md) {
                 Text(
                     text = "对全部图标从原图应用统一外形与背景色（将覆盖已有的单独编辑）。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text("外形", style = MaterialTheme.typography.titleSmall)
-                Spacer(modifier = Modifier.height(8.dp))
+                SectionHeader("外形")
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     IconShape.entries.filter { it != IconShape.ORIGINAL }.forEach { option ->
                         FilterChip(
                             selected = shape == option,
                             onClick = { shape = option },
-                            label = {
-                                Text(
-                                    when (option) {
-                                        IconShape.CIRCLE -> "圆形"
-                                        IconShape.ROUNDED_RECT -> "圆角"
-                                        IconShape.SQUIRCLE -> "Squircle"
-                                        IconShape.ORIGINAL -> "原图"
-                                    },
-                                )
-                            },
+                            label = { Text(option.iconShapeLabel()) },
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(12.dp))
-                Text("背景色", style = MaterialTheme.typography.titleSmall)
+                SectionHeader("背景色")
                 Text(
                     text = if (color == android.graphics.Color.TRANSPARENT) {
                         "默认「无」——不添加任何背景，只保留图标本身"
@@ -259,52 +231,21 @@ fun ShapeBatchDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    IconStyle.PRESET_COLORS.forEach { (preset, label) ->
-                        val selected = color == preset
-                        val transparent = preset == android.graphics.Color.TRANSPARENT
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(if (transparent) Color.White else Color(preset))
-                                .border(
-                                    width = if (selected) 3.dp else 1.dp,
-                                    color = if (selected) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.outline
-                                    },
-                                    shape = CircleShape,
-                                )
-                                .clickable { color = preset },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (transparent) {
-                                Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                            }
-                        }
-                    }
-                }
+                ColorSwatchRow(
+                    entries = IconStyle.PRESET_COLORS.map { (preset, label) ->
+                        ColorSwatch(preset, label)
+                    },
+                    selected = color,
+                    onSelect = { color = it },
+                )
 
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = overwriteEdited, onCheckedChange = { overwriteEdited = it })
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Column {
-                        Text("同时覆盖已单独编辑的图标", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            text = "默认跳过——避免冲掉你逐张调好的样式",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+                ToggleInfoRow(
+                    title = "同时覆盖已单独编辑的图标",
+                    subtitle = "默认跳过——避免冲掉你逐张调好的样式",
+                    leading = {
+                        Checkbox(checked = overwriteEdited, onCheckedChange = { overwriteEdited = it })
+                    },
+                )
             }
         },
         confirmButton = {

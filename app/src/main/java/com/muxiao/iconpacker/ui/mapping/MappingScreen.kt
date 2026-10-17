@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,16 +15,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
@@ -39,17 +37,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -57,10 +53,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.Image
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.muxiao.iconpacker.data.AppInfoProvider
@@ -68,7 +64,14 @@ import com.muxiao.iconpacker.data.IconAssetEntity
 import com.muxiao.iconpacker.domain.ImportBinder
 import com.muxiao.iconpacker.domain.MappingTarget
 import com.muxiao.iconpacker.ui.IconImage
+import com.muxiao.iconpacker.ui.components.AppScaffold
+import com.muxiao.iconpacker.ui.components.EmptyState
+import com.muxiao.iconpacker.ui.components.ScrollableDialogContent
+import com.muxiao.iconpacker.ui.theme.IconSize
+import com.muxiao.iconpacker.ui.theme.Spacing
 import com.muxiao.iconpacker.ui.toImageBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** 待指派图标的目标；[from] 非空表示这是"改包名"：那条映射将从 [from] 改挂到 [component] */
 private data class AssignTarget(val component: String, val from: String?)
@@ -84,6 +87,11 @@ private data class TargetDraft(
     val from: AppRow?,
     val iconSlot: Int? = null,
 )
+
+/** 对话框内列表的自适应高度：屏高的 50%（替代固定 320dp，大小屏都合适） */
+@Composable
+private fun dialogListHeight(): Dp =
+    (LocalConfiguration.current.screenHeightDp * 0.5f).dp
 
 /**
  * 映射工作台（FR-04）+ 图标导入（FR-03）+ 图标库反查。
@@ -108,7 +116,6 @@ fun MappingScreen(
     var detailIcon by remember { mutableStateOf<IconAssetEntity?>(null) }
     var showShapeBatch by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableIntStateOf(0) }
-
     // 照片选择器（免存储权限）
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(48),
@@ -129,29 +136,21 @@ fun MappingScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(state.packName.ifBlank { "映射工作台" }) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = viewModel::autoMatch) {
-                        Icon(Icons.Default.Refresh, contentDescription = "一键自动匹配")
-                    }
-                },
-            )
+    AppScaffold(
+        title = state.packName.ifBlank { "映射工作台" },
+        snackbarHostState = snackbarHostState,
+        onBack = onBack,
+        actions = {
+            IconButton(onClick = viewModel::autoMatch) {
+                Icon(Icons.Default.Refresh, contentDescription = "一键自动匹配")
+            }
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             // 导入通道 + 进度（两个 Tab 共用）
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AssistChip(
@@ -168,22 +167,20 @@ fun MappingScreen(
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 if (state.importing) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                    CircularProgressIndicator(modifier = Modifier.size(IconSize.progressSmall))
                 }
             }
 
             // 映射进度与打包入口
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column {
-                    Text(
-                        text = "已映射 ${state.mappedCount} / ${state.apps.size} · 图标 ${state.icons.size}",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
+                Text(
+                    text = "已映射 ${state.mappedCount} / ${state.apps.size} · 图标 ${state.icons.size}",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
                 Spacer(modifier = Modifier.weight(1f))
                 Button(onClick = onBuild, enabled = state.mappedCount > 0) {
                     Text("打包")
@@ -206,7 +203,9 @@ fun MappingScreen(
             when (selectedTab) {
                 0 -> Column(modifier = Modifier.fillMaxSize()) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = Spacing.lg, end = Spacing.sm, top = Spacing.sm),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         OutlinedTextField(
@@ -223,8 +222,8 @@ fun MappingScreen(
                         }
                     }
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.xs),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
                         FilterChip(
                             selected = state.onlyUnmapped,
@@ -247,8 +246,8 @@ fun MappingScreen(
                     } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                         ) {
                             items(state.visibleApps, key = { it.component }) { app ->
                                 AppRowItem(
@@ -264,8 +263,8 @@ fun MappingScreen(
 
                 else -> Column(modifier = Modifier.fillMaxSize()) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.xs),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -281,18 +280,10 @@ fun MappingScreen(
                     if (state.icons.isEmpty() && !state.importing) {
                         // 空状态引导：新项目最容易在"导入"这一步停顿——把两条导入通道
                         // 的入口明示在库面板里（顶部 chips 本就有，这里只是再指一次路）
-                        Box(
-                            modifier = Modifier.fillMaxSize().padding(32.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = "还没有图标。\n用上方「相册导入」逐张导入，\n" +
-                                    "或「ZIP 导入」整包导入图标包（自动建映射）。",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.align(Alignment.Center),
-                            )
-                        }
+                        EmptyState(
+                            message = "还没有图标。\n用上方「相册导入」逐张导入，\n" +
+                                "或「ZIP 导入」整包导入图标包（自动建映射）。",
+                        )
                     } else {
                         IconLibraryTab(
                             icons = state.icons,
@@ -387,22 +378,26 @@ private fun AppRowItem(
 ) {
     val assignedIcon = icons.firstOrNull { it.slot == app.assignedSlot }
 
-    Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+    Card(onClick = onClick) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AppIconThumb(packageName = app.packageName)
-            Spacer(modifier = Modifier.size(12.dp))
+            Spacer(modifier = Modifier.size(Spacing.md))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = app.label, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = app.label,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                )
                 // 包名可点即改：已映射的行才提供入口——没有映射时"改包名"无从谈起，
                 // 那种情况该走上面的「添加映射」
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = if (app.assignedSlot != null) {
                         Modifier.clickable(onClick = onEditTarget)
-                            .padding(vertical = 4.dp, horizontal = 2.dp)
+                            .padding(vertical = Spacing.xs, horizontal = Spacing.xs)
                     } else {
                         Modifier
                     },
@@ -413,7 +408,7 @@ private fun AppRowItem(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     if (app.assignedSlot != null) {
-                        Spacer(modifier = Modifier.size(4.dp))
+                        Spacer(modifier = Modifier.size(Spacing.xs))
                         Icon(
                             imageVector = Icons.Default.Edit,
                             contentDescription = "编辑映射的包名",
@@ -423,13 +418,19 @@ private fun AppRowItem(
                     }
                 }
             }
-            // 已指派图标预览
-            Box(modifier = Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+            // 已指派图标预览；未映射时以文字占位，保持行高稳定
+            Box(
+                modifier = Modifier
+                    .size(IconSize.row)
+                    .clip(MaterialTheme.shapes.small),
+                contentAlignment = Alignment.Center,
+            ) {
                 if (assignedIcon != null) {
                     IconImage(
                         path = assignedIcon.editedPath ?: assignedIcon.sourcePath,
                         contentDescription = null,
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
                     )
                 } else {
                     Text(
@@ -443,23 +444,29 @@ private fun AppRowItem(
     }
 }
 
-/** 应用图标缩略图（列表与选择器共用） */
+/** 应用图标缩略图（列表与选择器共用）；解码放到 IO 线程，列表滚动不卡主线程 */
 @Composable
 private fun AppIconThumb(packageName: String) {
     val context = LocalContext.current
     val appInfoProvider = remember(context) { AppInfoProvider(context) }
-    val appIcon: ImageBitmap? = remember(packageName) {
-        runCatching { appInfoProvider.loadAppIcon(packageName)?.toImageBitmap() }.getOrNull()
+    var appIcon by remember(packageName) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(packageName) {
+        appIcon = withContext(Dispatchers.IO) {
+            runCatching { appInfoProvider.loadAppIcon(packageName)?.toImageBitmap() }.getOrNull()
+        }
     }
     Box(
-        modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)),
+        modifier = Modifier
+            .size(IconSize.row)
+            .clip(MaterialTheme.shapes.small),
         contentAlignment = Alignment.Center,
     ) {
-        if (appIcon != null) {
+        val bitmap: ImageBitmap? = appIcon
+        if (bitmap != null) {
             Image(
-                bitmap = appIcon,
+                bitmap = bitmap,
                 contentDescription = null,
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit,
             )
         }
@@ -496,11 +503,7 @@ private fun MappingTargetDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (draft.from == null) "添加映射" else "编辑映射包名") },
         text = {
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .heightIn(max = 420.dp),
-            ) {
+            ScrollableDialogContent {
                 OutlinedTextField(
                     value = input,
                     onValueChange = { input = it },
@@ -510,7 +513,7 @@ private fun MappingTargetDialog(
                     isError = resolution is MappingTarget.Resolution.Invalid,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.size(Spacing.sm))
                 TextButton(
                     onClick = { pickingFromList = true },
                     enabled = apps.isNotEmpty(),
@@ -604,15 +607,20 @@ private fun InstalledAppPickerDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.size(Spacing.sm))
                 if (filtered.isEmpty()) {
                     Text(
                         text = "没有匹配的应用",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = Spacing.md),
                     )
                 } else {
-                    LazyColumn(modifier = Modifier.height(320.dp)) {
+                    // 高度跟随屏高的 50%：大屏不再固定 320dp 浪费，小屏不会顶爆对话框
+                    LazyColumn(
+                        modifier = Modifier.height(dialogListHeight()),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    ) {
                         items(filtered, key = { it.component }) { app ->
                             Row(
                                 modifier = Modifier
@@ -622,7 +630,7 @@ private fun InstalledAppPickerDialog(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 AppIconThumb(packageName = app.packageName)
-                                Spacer(modifier = Modifier.size(12.dp))
+                                Spacer(modifier = Modifier.size(Spacing.md))
                                 Column {
                                     Text(text = app.label, style = MaterialTheme.typography.bodyLarge)
                                     Text(
@@ -665,25 +673,27 @@ private fun IconPickerDialog(
             if (icons.isEmpty()) {
                 Text("图标池是空的，请先通过上方按钮导入图标。")
             } else {
-                androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
-                    columns = androidx.compose.foundation.lazy.grid.GridCells.Adaptive(72.dp),
-                    modifier = Modifier.height(320.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(88.dp),
+                    modifier = Modifier.height(dialogListHeight()),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     items(icons.size, key = { index -> icons[index].id }) { index ->
                         val icon = icons[index]
+                        // 单元格整体居中：条目不再贴左，网格观感均匀
                         Box(
                             modifier = Modifier
-                                .size(64.dp)
-                                .clip(RoundedCornerShape(8.dp))
+                                .fillMaxSize()
                                 .clickable { onSelect(icon.slot) },
                             contentAlignment = Alignment.Center,
                         ) {
                             IconImage(
                                 path = icon.editedPath ?: icon.sourcePath,
                                 contentDescription = icon.originalName,
-                                modifier = Modifier.size(56.dp),
+                                modifier = Modifier
+                                    .padding(Spacing.xs)
+                                    .size(64.dp),
                             )
                         }
                     }
