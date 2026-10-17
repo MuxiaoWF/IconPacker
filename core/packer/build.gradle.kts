@@ -17,6 +17,12 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    lint {
+        // 引擎刻意保持"最小 Android 依赖"，不引 androidx.core-ktx；
+        // Color.parseColor / Bitmap 工厂直接用 framework API 属有意为之。
+        disable += "UseKtx"
+    }
 }
 
 dependencies {

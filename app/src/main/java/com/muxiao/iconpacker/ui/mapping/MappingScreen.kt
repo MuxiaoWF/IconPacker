@@ -29,7 +29,6 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -93,6 +92,8 @@ private data class TargetDraft(
 
 /** 对话框内列表的自适应高度：屏高的 50%（替代固定 320dp，大小屏都合适） */
 @Composable
+// suppression：同 ScrollableDialogContent——Dialog 内 containerSize 语义不适用
+@Suppress("ConfigurationScreenWidthHeight")
 private fun dialogListHeight(): Dp =
     (LocalConfiguration.current.screenHeightDp * 0.5f).dp
 
@@ -102,7 +103,6 @@ private fun dialogListHeight(): Dp =
  * 双 Tab：应用（搜索 + 映射）／图标库（网格 + "供哪个 App 使用"反查）。
  * 顶部导入通道与映射进度两个 Tab 共用。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MappingScreen(
     packId: Long,
@@ -135,7 +135,11 @@ fun MappingScreen(
     val msgSeparator = stringResource(R.string.mapping_msg_separator)
     LaunchedEffect(state.message) {
         state.message?.takeIf { it.isNotEmpty() }?.let {
-            snackbarHostState.showSnackbar(it.map { part -> part.asString(context) }.joinToString(msgSeparator))
+            snackbarHostState.showSnackbar(it.joinToString(msgSeparator) { part ->
+                part.asString(
+                    context
+                )
+            })
             viewModel.consumeMessage()
         }
     }

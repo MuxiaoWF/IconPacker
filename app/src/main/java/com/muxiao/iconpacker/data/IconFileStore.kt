@@ -146,7 +146,7 @@ class IconFileStore(
                         }
                         // 优先 res/xml/appfilter.xml；同等级只认第一个
                         rank > appFilterRank -> {
-                            appFilterBytes = zis.readCapped(MAX_APP_FILTER_BYTES)
+                            appFilterBytes = zis.readCapped()
                             appFilterPath = name
                             appFilterRank = rank
                         }
@@ -344,8 +344,9 @@ class IconFileStore(
         }
     }
 
-    /** 读取至多 [limit] 字节：appfilter 是不可信输入，不能无上限地读进内存 */
-    private fun InputStream.readCapped(limit: Int): ByteArray {
+    /** 读取至多 [MAX_APP_FILTER_BYTES] 字节：appfilter 是不可信输入，不能无上限地读进内存 */
+    private fun InputStream.readCapped(): ByteArray {
+        val limit = MAX_APP_FILTER_BYTES
         val out = ByteArrayOutputStream()
         val buffer = ByteArray(8192)
         var total = 0

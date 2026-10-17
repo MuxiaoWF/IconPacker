@@ -118,7 +118,7 @@ class ZipRewriter(private val source: ByteArray) {
                 entry.size = bytes.size.toLong()
                 entry.compressedSize = bytes.size.toLong()
                 entry.crc = crc.value
-                entry.extra = alignmentExtra(out.size().toLong(), name, ALIGNMENT)
+                entry.extra = alignmentExtra(out.size().toLong(), name)
             }
         }
         zos.putNextEntry(entry)
@@ -129,12 +129,13 @@ class ZipRewriter(private val source: ByteArray) {
     }
 
     /**
-     * 计算使条目数据起点落在 [alignment] 字节边界所需的 extra 字段。
+     * 计算使条目数据起点落在对齐边界（[ALIGNMENT] 字节）所需的 extra 字段。
      * 数据起点 = 本地头起点 + 30（固定头）+ 名称字节数 + extra 长度。
      * 本地头起点即当前流写入字节数（[offsetBeforeHeader]）。
      * 返回的 extra 字段为单个 APK 对齐扩展域（tag 0xD935），保证可被 ZIP 阅读器正确解析。
      */
-    private fun alignmentExtra(offsetBeforeHeader: Long, name: String, alignment: Int): ByteArray {
+    private fun alignmentExtra(offsetBeforeHeader: Long, name: String): ByteArray {
+        val alignment = ALIGNMENT
         val nameLen = name.toByteArray(Charsets.UTF_8).size
         val headerBase = LOCAL_HEADER_FIXED + nameLen
         val need = (alignment - ((offsetBeforeHeader + headerBase) % alignment)) % alignment

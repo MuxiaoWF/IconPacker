@@ -95,8 +95,8 @@ class ApkBuilder(
  * 2. AXML：生成 appfilter.xml（映射）+ drawable.xml（图标清单）+ appmap.xml（组件映射）；
  * 3. ZIP：重写模板——替换 drawable 槽位与上述三个条目，剥离 META-INF/ 调试签名。
  *
- * 图标槽位目录与启动器图标条目都不硬编码，而是从模板条目探测（见 [probeIconDir] /
- * [probeLauncherIconEntry]）：aapt2 会按源工程限定符改写目录名，写错会让图标变成
+ * 图标槽位目录与启动器图标条目都不硬编码，而是从模板条目探测（见 [probeIconDir]）：
+ * aapt2 会按源工程限定符改写目录名，写错会让图标变成
  * arsc 不认识的孤儿条目，且不会报任何错。
  *
  * 条目名常量与 template 模块的资源布局一一对应，改动需同步两边。

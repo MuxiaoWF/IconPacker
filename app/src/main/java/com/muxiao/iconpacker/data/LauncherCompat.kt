@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
  * 启动器兼容性探测（FR-01）。
  *
  * 实现说明：
- * - 以"已安装的 HOME 启动器"为枚举源（[queryIntentActivities] 查 MAIN+HOME），
+ * - 以"已安装的 HOME 启动器"为枚举源（`queryIntentActivities` 查 MAIN+HOME），
  *   再用 [LauncherSupport] 按包名分类兼容性——这是可靠的主路径。
  *   早期实现只查 `org.adw.ActivityStarter.THEMES`，而 ColorOS/One UI/MIUI 等
  *   OEM 启动器不注册该动作，导致被误判为"不支持"。

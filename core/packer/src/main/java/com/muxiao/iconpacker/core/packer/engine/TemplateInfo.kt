@@ -7,7 +7,7 @@ package com.muxiao.iconpacker.core.packer.engine
  * 1. [PackageNameRules.suggest] 据此派生新项目的默认包名（`com.muxiao.icon.p<项目id>`）；
  * 2. 未显式指定包名时的兜底值。
  *
- * 打包时 [AxmlPatcher.setPackageName] 会把项目自己的包名写进产物清单，因此多个
+ * 打包时 `AxmlPatcher.setPackageName` 会把项目自己的包名写进产物清单，因此多个
  * 图标包可各自持有独立包名**并存安装**（详见 [PackageNameRules]）。
  * ⚠️ 改写 manifest 的同时**必须**用 arsc/ArscPatcher 把 resources.arsc 里的包名
  * 字符串一并改写：getIdentifier 按 arsc 包名精确匹配（AssetManager2::GetResourceId），

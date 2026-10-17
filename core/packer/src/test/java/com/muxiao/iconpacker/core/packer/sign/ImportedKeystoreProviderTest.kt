@@ -27,7 +27,7 @@ class ImportedKeystoreProviderTest {
     )
 
     @Test
-    fun `文件不存在时给出可定位的错误`() {
+    fun 文件不存在时给出可定位的错误() {
         val path = File(tmp.root, "missing.keystore").absolutePath
         try {
             provider(path).getOrCreate()
@@ -39,7 +39,7 @@ class ImportedKeystoreProviderTest {
     }
 
     @Test
-    fun `空白别名在打开文件前即被拦截`() {
+    fun 空白别名在打开文件前即被拦截() {
         val path = File(tmp.root, "any.keystore").apply { writeText("x") }.absolutePath
         try {
             ImportedKeystoreProvider(path, "p", alias = "", keyPassword = "").getOrCreate()
@@ -51,7 +51,7 @@ class ImportedKeystoreProviderTest {
     }
 
     @Test
-    fun `损坏的密钥库文件在试遍格式后合并报错`() {
+    fun 损坏的密钥库文件在试遍格式后合并报错() {
         val path = File(tmp.root, "broken.keystore").apply { writeText("not a keystore") }.absolutePath
         try {
             provider(path).getOrCreate()

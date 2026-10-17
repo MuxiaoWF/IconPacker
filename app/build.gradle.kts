@@ -43,6 +43,27 @@ android {
         localeFilters += listOf("zh", "en")
     }
 
+    // 应用运行时自行切换语言（LocaleMode），不依赖 Play 的语言（AAB）拆分；
+    // 显式关闭语言拆分，同时消除 AppBundleLocaleChanges 警告。
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
+
+    lint {
+        // 已启用运行时切换语言（LocaleMode），且不通过 Play 分发语言包：
+        // bundle.language.enableSplit=false 已从构建层面关闭语言拆分，此抑制覆盖
+        // IDE Inspect Code（它不读 bundle 配置）。
+        disable += "AppBundleLocaleChanges"
+        // 自有启动器图标本身就是位图铺满的设计（打包时由用户图标填充而非本图标），
+        // 按设计规范重绘轮廓收益低；报的是每 DPI 一张的同一类建议，直接忽略。
+        disable += "IconLauncherShape"
+        // 文案对单复数不敏感（计数随用户动态变化，zh 无复数形态；en 中采用
+        // "N" 直接陈述的写法），引入 plurals 需要连动两份资源与全部调用点，收益不匹配。
+        disable += "PluralsCandidate"
+    }
+
     dependenciesInfo {
         includeInApk = false
         includeInBundle = false

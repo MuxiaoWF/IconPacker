@@ -8,8 +8,8 @@ import java.nio.ByteOrder
 
 class ArscPatcherTest {
 
-    /** 构造最小合法 arsc：ResTable 头 + 一个包 chunk（id 0x7F，名字 [name]） */
-    private fun fakeArsc(name: String, trailingBytes: Int = 0): ByteArray {
+    /** 构造最小合法 arsc：ResTable 头 + 一个包 chunk（id 0x7F，固定包名 com.muxiao.icon） */
+    private fun fakeArsc(trailingBytes: Int = 0): ByteArray {
         val pkgHeader = 288 // type 2 + headerSize 2 + id 4 + name 256 + lastPublicType 4 + lastKey 4 + ... 取标准头
         val table = ByteBuffer.allocate(12 + pkgHeader + trailingBytes)
             .order(ByteOrder.LITTLE_ENDIAN)
@@ -22,7 +22,7 @@ class ArscPatcherTest {
         table.putInt(pkgHeader)                   // chunk size
         table.putInt(0x7F)                        // package id
         val nameField = ByteArray(256)
-        val utf16 = name.toByteArray(Charsets.UTF_16LE)
+        val utf16 = "com.muxiao.icon".toByteArray(Charsets.UTF_16LE)
         utf16.copyInto(nameField)
         table.put(nameField)
         table.putInt(0) // lastPublicType
@@ -32,7 +32,7 @@ class ArscPatcherTest {
 
     @Test
     fun `package name is rewritten in place`() {
-        val arsc = fakeArsc("com.muxiao.icon")
+        val arsc = fakeArsc()
         val out = ArscPatcher.setPackageName(arsc, "com.muxiao.icon.p4")
         assertEquals("com.muxiao.icon.p4", ArscPatcher.packageName(out))
         // 原位改写：长度不变（字段定长）
@@ -41,7 +41,7 @@ class ArscPatcherTest {
 
     @Test
     fun `longer package name still fits the fixed field`() {
-        val arsc = fakeArsc("com.muxiao.icon")
+        val arsc = fakeArsc()
         val longer = "com.muxiao.icon.pack.that.is.much.longer.than.original.p123"
         ArscPatcher.setPackageName(arsc, longer)
         assertEquals(longer, ArscPatcher.packageName(arsc))
@@ -49,7 +49,7 @@ class ArscPatcherTest {
 
     @Test
     fun `same package name returns arsc unchanged`() {
-        val arsc = fakeArsc("com.muxiao.icon")
+        val arsc = fakeArsc()
         val out = ArscPatcher.setPackageName(arsc, "com.muxiao.icon")
         assertEquals("com.muxiao.icon", ArscPatcher.packageName(out))
     }
@@ -57,7 +57,7 @@ class ArscPatcherTest {
     @Test
     fun `other chunks after the package chunk do not confuse the scan`() {
         // 包 chunk 之后有额外字节（真实 arsc 里是 type/key 池等子 chunk）
-        val arsc = fakeArsc("com.muxiao.icon", trailingBytes = 64)
+        val arsc = fakeArsc(trailingBytes = 64)
         ArscPatcher.setPackageName(arsc, "com.demo.p1")
         assertEquals("com.demo.p1", ArscPatcher.packageName(arsc))
     }
@@ -75,7 +75,7 @@ class ArscPatcherTest {
 
     @Test
     fun `invalid arguments fail loudly`() {
-        val arsc = fakeArsc("com.muxiao.icon")
+        val arsc = fakeArsc()
         assertThrows(IllegalArgumentException::class.java) {
             ArscPatcher.setPackageName(arsc, "")
         }

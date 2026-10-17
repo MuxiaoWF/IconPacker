@@ -11,7 +11,7 @@ import java.io.ByteArrayOutputStream
  *
  * 注意：它是**自洽性**验证器，不是规范验证器——读写两端共用同一套偏移约定，
  * 因此写入端整体偏了它也会跟着偏（attributeStart=36 的 bug 就这样逃逸了数月）。
- * 任何涉及二进制布局的改动，都必须同时过 [AxmlAapt2ParityTest] 的 aapt2 产物对拍。
+ * 任何涉及二进制布局的改动，都必须同时过 `AxmlAapt2ParityTest` 的 aapt2 产物对拍。
  *
  * 仅实现本产品用到的子集：文件头 + 字符串池 + 命名空间 chunk + 起止元素 chunk。
  * CDATA 文本节点在 appfilter / drawable / 清单中均不出现，未实现。
@@ -167,9 +167,6 @@ class AxmlReader(data: ByteArray) {
                 ((data[off + 1].toInt() and 0xFF) shl 8) or
                 ((data[off + 2].toInt() and 0xFF) shl 16) or
                 ((data[off + 3].toInt() and 0xFF) shl 24)
-
-        /** 便捷写入辅助（供补丁器重组用） */
-        fun writeU16(buf: ByteArray, off: Int, v: Int) = StringPool.putU16(buf, off, v)
 
         fun writeU32(buf: ByteArray, off: Int, v: Int) = StringPool.putU32(buf, off, v)
 

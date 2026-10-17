@@ -51,8 +51,8 @@ class RealTemplateTest {
         return out
     }
 
-    private fun attrOf(el: AxmlReader.Element, attribute: String): String? =
-        el.attributes.firstOrNull { it.name == attribute }?.rawValue
+    private fun attrOf(el: AxmlReader.Element): String? =
+        el.attributes.firstOrNull { it.name == "name" }?.rawValue
 
     /**
      * **resources.arsc 的包名必须跟随 manifest 的 package 改写**。
@@ -130,13 +130,13 @@ class RealTemplateTest {
         assertTrue(
             "<queries> 未声明 MAIN：非启动器应用仍然不可见",
             collect(queries, "intent").any { intent ->
-                intent.children.any { attrOf(it, "name") == "android.intent.action.MAIN" }
+                intent.children.any { attrOf(it) == "android.intent.action.MAIN" }
             },
         )
         assertEquals(
             "<queries> 里不能出现 <category>：字符串池会去重，抽屉开关会把它一并改掉",
             emptyList<String>(),
-            collect(queries, "category").map { attrOf(it, "name").orEmpty() },
+            collect(queries, "category").map { attrOf(it).orEmpty() },
         )
 
         // 识别 filter 中不受抽屉开关影响的 category（若被连带改坏说明池共享了槽位）
@@ -160,9 +160,9 @@ class RealTemplateTest {
         assertEquals(
             "抽屉入口（文档顺序第一个 <category>）应被改成 DEFAULT —— 定位错了这个开关就会失效",
             "android.intent.category.DEFAULT",
-            attrOf(hiddenCategories.first(), "name"),
+            attrOf(hiddenCategories.first()),
         )
-        val hiddenNames = hiddenCategories.map { attrOf(it, "name").orEmpty() }
+        val hiddenNames = hiddenCategories.map { attrOf(it).orEmpty() }
         assertTrue(
             "识别 filter 的 category 被抽屉开关连带改坏（字符串池共享槽位）：$hiddenNames",
             hiddenNames.containsAll(untouchedCategories),
@@ -170,7 +170,7 @@ class RealTemplateTest {
         assertTrue(
             "识别 action org.adw.launcher.THEMES 不应被抽屉开关改坏",
             collect(hiddenManifest.root, "action")
-                .any { attrOf(it, "name") == "org.adw.launcher.THEMES" },
+                .any { attrOf(it) == "org.adw.launcher.THEMES" },
         )
 
         // 切回显示：抽屉槽位恢复 LAUNCHER，识别 filter 依旧完好（来回切换幂等）
@@ -189,12 +189,12 @@ class RealTemplateTest {
         assertEquals(
             "抽屉入口应恢复 LAUNCHER",
             "android.intent.category.LAUNCHER",
-            attrOf(shownCategories.first(), "name"),
+            attrOf(shownCategories.first()),
         )
         assertTrue(
             "切回显示后识别 filter 的 category 不应丢失：" +
-                shownCategories.map { attrOf(it, "name").orEmpty() },
-            shownCategories.map { attrOf(it, "name").orEmpty() }.containsAll(untouchedCategories),
+                shownCategories.map { attrOf(it).orEmpty() },
+            shownCategories.map { attrOf(it).orEmpty() }.containsAll(untouchedCategories),
         )
     }
 
@@ -219,9 +219,9 @@ class RealTemplateTest {
         val filters = collect(activity, "intent-filter")
 
         fun actionsOf(filter: AxmlReader.Element) =
-            collect(filter, "action").mapNotNull { attrOf(it, "name") }.toSet()
+            collect(filter, "action").mapNotNull { attrOf(it) }.toSet()
         fun categoriesOf(filter: AxmlReader.Element) =
-            collect(filter, "category").mapNotNull { attrOf(it, "name") }.toSet()
+            collect(filter, "category").mapNotNull { attrOf(it) }.toSet()
 
         /** 存在一个 filter：其 action 覆盖 [actions]、category 覆盖 [categories] */
         fun hasFilter(actions: Set<String>, categories: Set<String>) =
@@ -295,7 +295,7 @@ class RealTemplateTest {
         assertTrue("模板里没有任何 dex 条目", dexEntries.isNotEmpty())
 
         val descriptor = "Lcom/muxiao/icon/MainActivity;"
-        val hit = dexEntries.any { containsAscii(ZipUtils.readEntry(template, it)!!, descriptor) }
+        val hit = dexEntries.any { containsAscii(ZipUtils.readEntry(template, it)!!) }
         assertTrue(
             "模板 dex（${dexEntries.joinToString()}）中找不到 $descriptor —— " +
                 "图标包应用会没有界面（点开即崩溃或空屏）",
@@ -321,8 +321,8 @@ class RealTemplateTest {
     }
 
     /** 纯 ASCII 子串查找（dex 里的类型描述符就是 ASCII/MUTF-8，无需引入 dex 解析库） */
-    private fun containsAscii(haystack: ByteArray, needle: String): Boolean {
-        val target = needle.toByteArray(Charsets.US_ASCII)
+    private fun containsAscii(haystack: ByteArray): Boolean {
+        val target = "Lcom/muxiao/icon/MainActivity;".toByteArray(Charsets.US_ASCII)
         if (target.isEmpty() || target.size > haystack.size) return false
         outer@ for (i in 0..haystack.size - target.size) {
             for (j in target.indices) {
@@ -378,7 +378,7 @@ class RealTemplateTest {
      * "应用信息"里都显示 1.0：用户填了自定义版本，在设备上却完全看不到，等于没生效。
      * 两者语义不同、都要可设：versionCode 决定能否覆盖安装，versionName 只是给人看的。
      *
-     * 注意 versionCode 断言用 `data` 而非 `rawValue`——[AxmlPatcher.setIntAttribute]
+     * 注意 versionCode 断言用 `data` 而非 `rawValue`——`AxmlPatcher.setIntAttribute`
      * 是原地改写 typedValue.data，字符串池里那条 raw 仍指向模板旧值（aapt2 产物中
      * rawValue 与 data 本就可能不一致，系统读的是 data）。
      */
@@ -461,7 +461,7 @@ class RealTemplateTest {
             showInDrawer = true,
         )
 
-        val (method, dataStart) = localEntryInfo(out, "resources.arsc")
+        val (method, dataStart) = localEntryInfo(out)
         assertEquals("resources.arsc 必须为 STORED（未压缩）", ZipEntry.STORED, method)
         assertEquals(
             "resources.arsc 数据起点必须 4 字节对齐（R+ 安装硬性要求）",
@@ -472,7 +472,7 @@ class RealTemplateTest {
 
     /**
      * 回归（图标不切换根因）：产物中的 appfilter.xml / drawable.xml 必须是结构合法的
-     * 二进制 AXML。历史上 [AxmlWriter] 曾两次写错 start 元素节点的字段：
+     * 二进制 AXML。历史上 `AxmlWriter` 曾两次写错 start 元素节点的字段：
      * 先是 headerSize=36（框架定位 ns/name 越界），修的时候又把 attributeStart 一并改成 36 ——
      * 而 attributeStart 的基准是 attrExt 起点（chunk 起点 + headerSize），正确值恒为 20。
      * 结果是 ColorOS 等启动器用框架原生解析器（nativeOpenXmlAsset）读 appfilter 时判为
@@ -732,7 +732,8 @@ class RealTemplateTest {
      * 走中央目录而非本地头：Java ZipOutputStream 对 DEFLATED 条目使用数据描述符，
      * 本地头的尺寸字段为 0，逐条扫描本地头会错位；中央目录则含真实尺寸与本地头偏移。
      */
-    private fun localEntryInfo(zip: ByteArray, name: String): Pair<Int, Int> {
+    private fun localEntryInfo(zip: ByteArray): Pair<Int, Int> {
+        val name = "resources.arsc"
         // 1) 找 End Of Central Directory（签名 PK\x05\x06），从文件尾向前扫
         val eocdSig = byteArrayOf(0x50, 0x4B, 0x05, 0x06)
         var eocd = zip.size - 22

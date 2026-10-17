@@ -6,7 +6,6 @@ import com.muxiao.iconpacker.core.packer.engine.PackageNameRules
 import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
-import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

@@ -63,5 +63,6 @@ android {
         // 占位槽位不会被任何代码/XML 引用（drawable.xml/appfilter.xml 是空占位），
         // "unused resource" 报红属预期误报；禁用以免误触 "Remove Unused Resources" 批量删除。
         disable += "UnusedResources"
+        disable += "IconLauncherShape" // 占位图标铺满位图属预期（会被产物图标整体替换）
     }
 }

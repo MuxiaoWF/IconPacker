@@ -33,6 +33,7 @@ fun UiText.asString(): String {
     return stringResource(res, *resolved.toTypedArray())
 }
 
+@Suppress("SimplifiableCallChain") // 嵌套 UiText 的解析是 @Composable 调用，改成 joinToString 会脱离 composable 上下文
 @Composable
 private fun resolveUiArg(arg: Any): Any = when (arg) {
     is UiText -> arg.asString()
@@ -51,7 +52,13 @@ fun UiText.asString(context: Context): String {
 
 private fun resolveContextArg(arg: Any, context: Context): Any = when (arg) {
     is UiText -> arg.asString(context)
-    is List<*> -> arg.map { part -> resolveContextArg(part ?: ".", context).toString() }.joinToString("")
+    is List<*> -> arg.joinToString("") { part ->
+        resolveContextArg(
+            part ?: ".",
+            context
+        ).toString()
+    }
+
     else -> arg
 }
 

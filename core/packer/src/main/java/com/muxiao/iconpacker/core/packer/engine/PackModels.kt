@@ -68,7 +68,7 @@ data class PackRequest(
     /**
      * 产物 minSdk 重写（写入清单 `<uses-sdk android:minSdkVersion>`；null = 沿用模板值）。
      * 设备上装不上 minSdk 过低的包（`INSTALL_FAILED_OLDER_SDK`），这里让用户抬高
-     * 项目的实际生效门槛；校验见 [createPack]/表单（minSdk ≥ 24，与模板一致）。
+     * 项目的实际生效门槛；校验见 `createPack`/表单（minSdk ≥ 24，与模板一致）。
      * 模板缺 `<uses-sdk>` 时降级保持模板原值（不阻断打包）。
      */
     val overrideMinSdk: Int? = null,

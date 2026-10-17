@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * 全局默认值（SharedPreferences，非 Room：设置不属于任何项目，也无需迁移）。
  *
  * 现有字段都是"新建项目时预填什么"的口径：
- * - 版本名 / 签名者名：留空 = 维持各自引擎默认（见 [PackForm] 的折算）；
+ * - 版本名 / 签名者名：留空 = 维持各自引擎默认（见 `PackForm` 的折算）；
  * - 签名方案：新建项目的初始开关状态（编辑旧行为默认全开）；
  * - 产物文件名模板：导出 SAF 对话框的建议文件名，占位符 `{name}`/`{version}`/`{code}`。
  *

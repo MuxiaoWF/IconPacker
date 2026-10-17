@@ -111,7 +111,6 @@
     <string name="common_delete">删除</string>
     <string name="common_save">保存</string>
     <string name="common_create">创建</string>
-    <string name="common_confirm">确定</string>
 
     <!-- ===== 通用菜单 ===== -->
     <string name="menu_edit_pack">编辑名称与图标</string>

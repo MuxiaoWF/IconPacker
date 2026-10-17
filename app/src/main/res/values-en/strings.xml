@@ -111,7 +111,6 @@
     <string name="common_delete">Delete</string>
     <string name="common_save">Save</string>
     <string name="common_create">Create</string>
-    <string name="common_confirm">OK</string>
 
     <!-- ===== Context menus ===== -->
     <string name="menu_edit_pack">Edit name &amp; icon</string>

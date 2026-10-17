@@ -21,10 +21,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -65,6 +63,7 @@ import com.muxiao.iconpacker.ui.components.asString
 import com.muxiao.iconpacker.ui.components.colorSwatchLabelRes
 import com.muxiao.iconpacker.ui.components.iconShapeLabel
 import com.muxiao.iconpacker.ui.theme.Spacing
+import java.util.Locale
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -82,7 +81,6 @@ private const val DEFAULT_BORDER_WIDTH = 0.04f
  * 布局：保存（及还原）置于 bottomBar——长表单滚到底不必再回来找保存；
  * 内容区垂直滚动，裁剪取景框宽度自适应（小屏不溢出，大屏不收窄）。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IconEditorScreen(
     packId: Long,
@@ -164,7 +162,8 @@ private fun EditorBody(
                 Text(
                     text = stringResource(
                         R.string.editor_zoom_label,
-                        String.format("%.1f", style.crop.zoom),
+                        // 固定 US 小数点格式：本地化范围仅 zh/en，且这是缩放倍率的数值标注
+                        String.format(Locale.US, "%.1f", style.crop.zoom),
                     ),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

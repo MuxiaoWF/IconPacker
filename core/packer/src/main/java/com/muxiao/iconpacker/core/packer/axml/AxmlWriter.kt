@@ -37,7 +37,7 @@ data class AxmlAttr(
  *   误写成 36（chunk 相对偏移）会让框架把属性数组起点算到 chunk 起点 + 52，
  *   越过节点 chunk 末尾，产物被判 corrupt：
  *   `Bad XML block: node attributes use 0x24 bytes, only have 0x14 bytes`。
- *   —— 该错误曾长期存在且被 [AxmlWriterStructureTest] 的错误断言固化，
+ *   —— 该错误曾长期存在且被 `AxmlWriterStructureTest` 的错误断言固化，
  *   导致启动器完全读不到 appfilter 映射表（表现为图标包可选中但图标不切换）。
  *
  * 清单不走本类生成，而采用模板补丁（见 [AxmlPatcher]）：模板清单由 aapt2 产出，
@@ -90,10 +90,10 @@ class AxmlWriter(
     private fun collect(el: AxmlElement, pool: StringPool) {
         pool.intern(el.name)
         el.nsUri?.let { pool.intern(it) }
-        for (attr in el.attributes) {
-            pool.intern(attr.name)
-            attr.nsUri?.let { pool.intern(it) }
-            when (val v = attr.value) {
+        for ((name, value, nsUri) in el.attributes) {
+            pool.intern(name)
+            nsUri?.let { pool.intern(it) }
+            when (val v = value) {
                 is AttrValue.Str -> pool.intern(v.value)
                 is AttrValue.Ref -> v.raw?.let { pool.intern(it) }
                 else -> Unit
@@ -184,7 +184,7 @@ class AxmlWriter(
         /**
          * sizeof(ResXMLTree_attrExt)：ns(4) + name(4) + 6×u16 尾部字段(12)。
          *
-         * 即 start 元素 [attributeStart] 字段的取值。框架以 attrExt 起点（chunk 起点 +
+         * 即 start 元素 `attributeStart` 字段的取值。框架以 attrExt 起点（chunk 起点 +
          * headerSize）为基准，再偏移 attributeStart 定位属性数组；写成 chunk 相对偏移
          * （36）会越界并被判 corrupt。
          */

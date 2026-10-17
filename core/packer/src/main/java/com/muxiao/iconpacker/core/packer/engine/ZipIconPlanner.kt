@@ -32,10 +32,7 @@ object ZipIconPlanner {
         val fileName: String,
         /** 落库与匹配用的键：优先包名，其次有意义的目录名，最后文件名 */
         val matchKey: String,
-    ) {
-        /** 去掉图片扩展名的文件名——appfilter 的 drawable 名即此值 */
-        val bareName: String get() = IconMatchKeys.stripImageExtension(fileName)
-    }
+    )
 
     data class Plan(val kept: List<Planned>, val duplicates: Int)
 

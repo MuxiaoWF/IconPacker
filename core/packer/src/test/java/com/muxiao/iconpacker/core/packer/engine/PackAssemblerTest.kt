@@ -101,7 +101,7 @@ class PackAssemblerTest {
             zos.putNextEntry(ZipEntry("AndroidManifest.xml")); zos.write(manifest); zos.closeEntry()
             // 最小真实结构 arsc（ResTable 头 + 包 chunk）：打包时会按产物包名原位改写
             // 它的包名字符串（见 arsc/ArscPatcher），占位假字节会 fail-fast
-            zos.putNextEntry(ZipEntry("resources.arsc")); zos.write(fakeArsc("com.muxiao.icon")); zos.closeEntry()
+            zos.putNextEntry(ZipEntry("resources.arsc")); zos.write(fakeArsc()); zos.closeEntry()
             zos.putNextEntry(ZipEntry("res/xml/appfilter.xml"))
             zos.write(AxmlWriter().write(AxmlElement("resources"))); zos.closeEntry()
             zos.putNextEntry(ZipEntry("res/xml/drawable.xml"))
@@ -261,7 +261,7 @@ class PackAssemblerTest {
     @Test
     fun `missing icon slot entry in template fails loudly instead of silently appending`() {
         // 模板缺少 ic_0002 槽位：必须报错，而不是把图标追加成 arsc 不认识的孤儿条目
-        val breakTemplate = zipWithoutEntry(buildTemplate(), "res/drawable-xxxhdpi-v4/ic_0002.png")
+        val breakTemplate = zipWithoutEntry(buildTemplate())
         val error = assertThrows(IllegalArgumentException::class.java) {
             PackAssembler.buildUnsigned(
                 template = breakTemplate,
@@ -274,8 +274,8 @@ class PackAssemblerTest {
         assertTrue("报错信息应指出缺失的槽位", error.message!!.contains("ic_0002"))
     }
 
-    /** 构造最小真实结构 arsc：ResTable 头（12B，packageCount=1）+ 包 chunk（id 0x7F） */
-    private fun fakeArsc(packageName: String): ByteArray {
+    /** 构造最小真实结构 arsc：ResTable 头（12B，packageCount=1）+ 包 chunk（id 0x7F，固定包名 com.muxiao.icon） */
+    private fun fakeArsc(): ByteArray {
         val pkgHeader = 288
         val buf = java.nio.ByteBuffer.allocate(12 + pkgHeader)
             .order(java.nio.ByteOrder.LITTLE_ENDIAN)
@@ -288,21 +288,21 @@ class PackAssemblerTest {
         buf.putInt(pkgHeader)                      // chunk size
         buf.putInt(0x7F)                           // package id
         val nameField = ByteArray(256)
-        packageName.toByteArray(Charsets.UTF_16LE).copyInto(nameField)
+        "com.muxiao.icon".toByteArray(Charsets.UTF_16LE).copyInto(nameField)
         buf.put(nameField)
         buf.putInt(0) // lastPublicType
         buf.putInt(0) // lastKeyType
         return buf.array()
     }
 
-    /** 从 ZIP 中剔除一个条目，用于构造"模板不完整"的场景 */
-    private fun zipWithoutEntry(zip: ByteArray, drop: String): ByteArray {
+    /** 从 ZIP 中剔除一个条目，用于构造"模板缺 ic_0002 槽位"的场景 */
+    private fun zipWithoutEntry(zip: ByteArray): ByteArray {
         val out = ByteArrayOutputStream()
         ZipOutputStream(out).use { zos ->
             ZipInputStream(zip.inputStream()).use { zis ->
                 var e = zis.nextEntry
                 while (e != null) {
-                    if (e.name != drop && !e.isDirectory) {
+                    if (e.name != "res/drawable-xxxhdpi-v4/ic_0002.png" && !e.isDirectory) {
                         zos.putNextEntry(ZipEntry(e.name))
                         zos.write(zis.readBytes())
                         zos.closeEntry()

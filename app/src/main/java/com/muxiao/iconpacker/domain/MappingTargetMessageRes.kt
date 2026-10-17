@@ -1,6 +1,5 @@
 package com.muxiao.iconpacker.domain
 
-import androidx.annotation.StringRes
 import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.core.packer.engine.PackageNameRules
 

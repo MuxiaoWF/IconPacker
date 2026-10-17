@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
 /**
  * 应用行：设备或映射表里的一个目标 + 当前指派槽位（null = 未映射）。
  *
- * [apps] 列表里只包含**本机已安装**的应用。导入图标包时为目标未安装的应用建立的
+ * `apps` 列表里只包含**本机已安装**的应用。导入图标包时为目标未安装的应用建立的
  * 预置映射仍留在库里（应用装上后自动校准、打包时一并写入），但不占列表位置——
  * 一个覆盖 800 个应用的图标包会让这里多出几百行与当前设备无关的条目。
  *
@@ -66,7 +66,7 @@ data class MappingUiState(
     val visibleApps: List<AppRow>
         get() = apps
             .asSequence()
-            .filter { if (onlyUnmapped) it.assignedSlot == null else true }
+            .filter { !onlyUnmapped || it.assignedSlot == null }
             .filter { app ->
                 query.isBlank() ||
                     app.label.contains(query, ignoreCase = true) ||
@@ -277,7 +277,7 @@ class MappingViewModel(
         }
 
         if (outcome.autoMapped > 0) {
-            val detail = buildList<UiText> {
+            val detail = buildList {
                 if (outcome.manifestMapped > 0) add(UiText(R.string.msg_automap_manifest, outcome.manifestMapped))
                 if (outcome.packageMapped > 0) add(UiText(R.string.msg_automap_package, outcome.packageMapped))
             }.flatMapIndexed { i, part ->

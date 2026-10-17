@@ -599,7 +599,7 @@ class PackRepository(
         packDao.commitVersion(packId, versionCode, System.currentTimeMillis())
         // 启动器图标：已设置则编码字节交给引擎；未设置传 null，沿用模板占位图
         val packIconBytes = pack.iconPath?.let { path ->
-            val file = java.io.File(path)
+            val file = File(path)
             if (file.isFile) file.readBytes() else null
         }
         return PackRequest(
@@ -638,7 +638,7 @@ class PackRepository(
             ImportedKeystoreProvider(
                 keystorePath = path,
                 storePassword = pack.keystorePassword.orEmpty(),
-                alias = pack.keystoreAlias!!,
+                alias = pack.keystoreAlias,
                 keyPassword = pack.keyPassword.orEmpty(),
                 signerName = pack.signerName?.takeIf { it.isNotBlank() }
                     ?: ImportedKeystoreProvider.DEFAULT_SIGNER_NAME,
@@ -675,12 +675,6 @@ class PackRepository(
         assetDao.updateEdit(packId, slot, path)
         touchPack(packId)
         return path
-    }
-
-    /** 保存编辑产物路径（文件由调用方写入） */
-    suspend fun updateIconEdit(packId: Long, slot: Int, editedPath: String?) {
-        assetDao.updateEdit(packId, slot, editedPath)
-        touchPack(packId)
     }
 
     /** 还原为原图：删除编辑产物文件并清字段 */
@@ -720,9 +714,6 @@ class PackRepository(
 
     // ---- 产物管理（FR-08） ----
 
-    /** 项目最新产物路径（无则 null） */
-    fun latestArtifactPath(packId: Long): String? = fileStore.latestArtifact(packId)?.absolutePath
-
     /** 导出最新产物到用户选定 Uri；返回写入字节数 */
     suspend fun exportLatestArtifact(packId: Long, target: Uri): Long {
         val artifact = fileStore.latestArtifact(packId)
@@ -746,7 +737,7 @@ class PackRepository(
         val assets = assetDao.getByPack(packId)
         var compressed = 0
         assets.forEach { asset ->
-            val file = java.io.File(asset.sourcePath)
+            val file = File(asset.sourcePath)
             if (!file.isFile) return@forEach
             val result = fileStore.compressImported(file)
             if (result.absolutePath != asset.sourcePath) {

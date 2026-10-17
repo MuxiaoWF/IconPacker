@@ -256,12 +256,12 @@ class IconProcessor(
             // 画布此时尚无任何裁剪区，clipPath(path) 的求交等价于直接设定形状。
             // 不用 clipPath(path, Region.Op.REPLACE)：该重载在 API 28 起废弃。
             canvas.save()
-            canvas.clipPath(shapePath(style, 0f))
+            canvas.clipPath(shapePath(style))
         }
 
         if (style.hasBackground) {
             val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = style.backgroundColor }
-            if (clipped) canvas.drawPath(shapePath(style, 0f), fill) else canvas.drawRect(fullRect, fill)
+            if (clipped) canvas.drawPath(shapePath(style), fill) else canvas.drawRect(fullRect, fill)
         }
 
         val contentPx = (size * style.contentScale.coerceIn(0.2f, 1f)).toInt().coerceAtLeast(1)
@@ -299,17 +299,17 @@ class IconProcessor(
         return output
     }
 
-    /** 外形路径；[inset] 用于描边时向内收缩，避免半个线宽被画布裁掉 */
-    private fun shapePath(style: IconStyle, inset: Float): Path {
+    /** 外形路径（无收缩；描边走独立 strokeRect/squirclePath 计算交由调用处处理） */
+    private fun shapePath(style: IconStyle): Path {
         val sizeF = targetPx.toFloat()
-        val rect = RectF(inset, inset, sizeF - inset, sizeF - inset)
+        val rect = RectF(0f, 0f, sizeF, sizeF)
         return when (style.shape) {
             IconShape.CIRCLE -> Path().apply { addOval(rect, Path.Direction.CW) }
             IconShape.ROUNDED_RECT -> Path().apply {
                 val r = (sizeF * style.cornerRatio).coerceAtLeast(0f)
                 addRoundRect(rect, r, r, Path.Direction.CW)
             }
-            IconShape.SQUIRCLE -> squirclePath(sizeF, inset)
+            IconShape.SQUIRCLE -> squirclePath(sizeF, 0f)
             IconShape.ORIGINAL -> Path().apply { addRect(rect, Path.Direction.CW) }
         }
     }

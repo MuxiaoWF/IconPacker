@@ -17,8 +17,6 @@ package com.muxiao.iconpacker.core.packer.axml
  */
 object AxmlPatcher {
 
-    private const val ANDROID_NS = "http://schemas.android.com/apk/res/android"
-
     /**
      * 替换指定元素的字符串属性值（如 application 的 label）。
      *
@@ -267,7 +265,4 @@ object AxmlPatcher {
         }
         error("未找到元素 <$elementName> 的整数属性 $attributeName")
     }
-
-    /** 仅供文档说明：android 命名空间 URI（模板清单中 label/versionCode 所在命名空间） */
-    fun androidNamespaceUri(): String = ANDROID_NS
 }

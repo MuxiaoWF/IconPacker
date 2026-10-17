@@ -21,7 +21,7 @@ import com.muxiao.iconpacker.core.packer.engine.IconPackManifest
  *  错配比不匹配更让人困惑，必须由用户点"一键自动匹配"主动触发。
  *  （见 [AppMatcher]）
  *
- * 安全约束：不覆盖用户已有的映射（[skipComponents]）。
+ * 安全约束：不覆盖用户已有的映射（`skipComponents`）。
  */
 object ImportBinder {
 

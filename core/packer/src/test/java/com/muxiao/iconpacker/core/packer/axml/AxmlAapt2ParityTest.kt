@@ -13,7 +13,7 @@ import org.junit.Test
  * `Bad XML block: node attributes use 0x24 bytes, only have 0x14 bytes`，
  * appfilter.xml / drawable.xml 读不出来 → 图标包可选中但图标不切换。
  *
- * 因此这里引入一个**外部基线** `src/test/resources/axml/appfilter.aapt2.xml`，
+ * 因此这里引入一个**外部基线** `src/test/resources/axml/appfilter.aapt2.bin`，
  * 内容与本测试构造的文档完全一致，由本机 aapt2 34.0.0 编译得到：
  * ```
  * aapt2 compile --dir res -o compiled.zip
@@ -33,7 +33,7 @@ class AxmlAapt2ParityTest {
             ?: error("缺少 aapt2 基线文件 src/test/resources/axml/$name")
 
     /** aapt2 基线（只读对照，不参与构建） */
-    private fun baseline(): ByteArray = resource("appfilter.aapt2.xml")
+    private fun baseline(): ByteArray = resource("appfilter.aapt2.bin")
 
     /** 与基线等价的文档，由被测写入端生成 */
     private fun writerOutput(): ByteArray = AxmlWriter().write(
@@ -182,7 +182,7 @@ class AxmlAapt2ParityTest {
      */
     @Test
     fun `utf8 pool with multibyte characters uses the second length prefix`() {
-        val root = AxmlReader(resource("utf8-multibyte.aapt2.xml")).root
+        val root = AxmlReader(resource("utf8-multibyte.aapt2.bin")).root
         assertEquals("resources", root.name)
         val item = root.children.single()
         assertEquals("item", item.name)

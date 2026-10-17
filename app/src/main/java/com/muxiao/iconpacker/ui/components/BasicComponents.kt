@@ -98,6 +98,9 @@ fun AppScaffold(
  * 小屏与横屏下不再溢出，大屏下也不再浪费空间。
  */
 @Composable
+// suppression：Dialog 组合中的 LocalWindowInfo.containerSize 指对话框窗口容器而非屏幕，
+// 屏高比例的语义只能取活动 Configuration 的 screenHeightDp
+@Suppress("ConfigurationScreenWidthHeight")
 fun ScrollableDialogContent(
     modifier: Modifier = Modifier,
     contentSpacing: Dp = 0.dp,

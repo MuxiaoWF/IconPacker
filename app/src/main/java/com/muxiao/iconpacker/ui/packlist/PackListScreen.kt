@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,7 +25,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,11 +45,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.muxiao.iconpacker.R
-import com.muxiao.iconpacker.data.AppSettings
 import com.muxiao.iconpacker.data.IconFileStore
 import com.muxiao.iconpacker.data.PackEntity
 import com.muxiao.iconpacker.data.toSignConfig
@@ -72,7 +68,6 @@ import com.muxiao.iconpacker.ui.theme.Spacing
  * 每项展示：版本与打包状态（未打包 / 有未提交修改 / 已打包）、
  * 安装状态徽标（与设备上已安装的产物版本对比）、导出与删除操作。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PackListScreen(
     onOpenPack: (Long) -> Unit,
@@ -350,9 +345,10 @@ fun PackListScreen(
     }
 
     pendingBackupExport?.let { pack ->
-            LaunchedEffect(pack.id) {
-                backupExportLauncher.launch(context.getString(R.string.packlist_backup_filename, pack.name))
-            }
+        val backupFileName = stringResource(R.string.packlist_backup_filename, pack.name)
+        LaunchedEffect(pack.id) {
+            backupExportLauncher.launch(backupFileName)
+        }
     }
 }
 

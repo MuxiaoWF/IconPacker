@@ -16,13 +16,13 @@ import org.junit.Test
 class PackFormTest {
 
     @Test
-    fun `空白表单不可保存`() {
+    fun 空白表单不可保存() {
         val form = PackForm()
         assertFalse(form.isValid)
     }
 
     @Test
-    fun `默认配置即可保存_包名留空表示自动派生`() {
+    fun 默认配置即可保存_包名留空表示自动派生() {
         val form = PackForm()
         form.name = "测试包"
         assertTrue(form.isValid)
@@ -35,7 +35,7 @@ class PackFormTest {
     }
 
     @Test
-    fun `非法包名与坏版本号分别报错`() {
+    fun 非法包名与坏版本号分别报错() {
         val form = PackForm()
         form.name = "测试包"
         form.packageName = "not valid pkg"
@@ -54,7 +54,7 @@ class PackFormTest {
     }
 
     @Test
-    fun `导入密钥模式缺文件与别名不可保存`() {
+    fun 导入密钥模式缺文件与别名不可保存() {
         val form = PackForm()
         form.name = "测试包"
         form.importedKey = true
@@ -68,7 +68,7 @@ class PackFormTest {
     }
 
     @Test
-    fun `全部签名方案关闭不可保存`() {
+    fun 全部签名方案关闭不可保存() {
         val form = PackForm()
         form.name = "测试包"
         form.schemeV1 = false
@@ -101,7 +101,7 @@ class PackFormTest {
     }
 
     @Test
-    fun `设备模式切回默认签名身份`() {
+    fun 设备模式切回默认签名身份() {
         val form = PackForm()
         form.name = "测试包"
         form.importedKey = false
@@ -113,7 +113,7 @@ class PackFormTest {
     }
 
     @Test
-    fun `清除密钥同时复位导入子项`() {
+    fun 清除密钥同时复位导入子项() {
         val form = PackForm()
         form.name = "测试包"
         form.importedKey = true

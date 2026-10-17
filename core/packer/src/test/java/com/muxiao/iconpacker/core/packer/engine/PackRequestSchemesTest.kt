@@ -27,20 +27,20 @@ class PackRequestSchemesTest {
         )
 
     @Test
-    fun `默认三方案同签`() {
+    fun 默认三方案同签() {
         val request = request(SigningSchemes())
         assertTrue(request.signingSchemes.v1 && request.signingSchemes.v2 && request.signingSchemes.v3)
     }
 
     @Test
-    fun `单一方案也可构建`() {
+    fun 单一方案也可构建() {
         request(SigningSchemes(v1 = false, v2 = true, v3 = false))
         request(SigningSchemes(v1 = true, v2 = false, v3 = false))
         request(SigningSchemes(v1 = false, v2 = false, v3 = true))
     }
 
     @Test
-    fun `全部方案关闭直接拒绝`() {
+    fun 全部方案关闭直接拒绝() {
         try {
             request(SigningSchemes(v1 = false, v2 = false, v3 = false))
         } catch (e: IllegalArgumentException) {

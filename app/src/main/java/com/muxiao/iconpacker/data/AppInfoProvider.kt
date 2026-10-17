@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
  * 合规说明（docs/android-verification.md）：不申请 QUERY_ALL_PACKAGES，依赖清单 `<queries>`
  * 的 MAIN/LAUNCHER 意图声明获取"有桌面图标的应用"——恰好是映射需求的全部范围。
  *
- * @param component `ComponentInfo{包名/活动类}`，直接用作 appfilter 的 component 值
+ * 条目 `component`：`ComponentInfo{包名/活动类}`，直接用作 appfilter 的 component 值
  */
 class AppInfoProvider(private val context: Context) {
 

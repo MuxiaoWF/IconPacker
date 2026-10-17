@@ -34,7 +34,7 @@ class IconPackManifestTest {
 
     @Test
     fun `binary axml is detected by the root chunk type`() {
-        assertTrue(IconPackManifest.isBinaryAxml(resource("appfilter.aapt2.xml")))
+        assertTrue(IconPackManifest.isBinaryAxml(resource("appfilter.aapt2.bin")))
         assertFalse(IconPackManifest.isBinaryAxml(plainAppFilter.toByteArray()))
         assertFalse(IconPackManifest.isBinaryAxml(ByteArray(0)))
     }
@@ -43,7 +43,7 @@ class IconPackManifestTest {
 
     @Test
     fun `aapt2-compiled appfilter is parsed`() {
-        val parsed = IconPackManifest.parse(resource("appfilter.aapt2.xml"))
+        val parsed = IconPackManifest.parse(resource("appfilter.aapt2.bin"))
         assertEquals(IconPackManifest.Format.BINARY_AXML, parsed.format)
         assertEquals(2, parsed.entries.size)
         assertEquals("ComponentInfo{a/.B}", parsed.entries[0].component)
@@ -54,7 +54,7 @@ class IconPackManifestTest {
 
     @Test
     fun `utf8 multibyte appfilter is parsed without mangling`() {
-        val parsed = IconPackManifest.parse(resource("utf8-multibyte.aapt2.xml"))
+        val parsed = IconPackManifest.parse(resource("utf8-multibyte.aapt2.bin"))
         val entry = parsed.entries.single()
         assertEquals("图标_1", entry.drawable)
         // 中文不能当包名——否则中文应用名会被误识别为包名
