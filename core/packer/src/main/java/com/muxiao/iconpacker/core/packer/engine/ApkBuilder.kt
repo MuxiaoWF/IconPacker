@@ -64,6 +64,7 @@ class ApkBuilder(
                 unsigned,
                 File(request.outputPath),
                 identity,
+                request.signingSchemes,
             )
             onProgress(step, 1, 1)
 

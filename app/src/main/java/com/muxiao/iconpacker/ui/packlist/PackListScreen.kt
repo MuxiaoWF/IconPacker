@@ -24,20 +24,22 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -57,8 +59,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.muxiao.iconpacker.core.packer.engine.PackageNameRules
 import com.muxiao.iconpacker.data.PackEntity
+import com.muxiao.iconpacker.data.toSignConfig
 import com.muxiao.iconpacker.domain.PackVersionRules
 
 /**
@@ -75,24 +77,59 @@ fun PackListScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    var showCreate by remember { mutableStateOf(false) }
+    // 新建：表单整体提升到 Screen（对话框只负责呈现与提交），启动器图标与
+    // 密钥库文件的 SAF 结果要跨 Activity 生命周期回填表单，必须放在对话框外
+    var createForm by remember { mutableStateOf<PackForm?>(null) }
     var pendingDelete by remember { mutableStateOf<PackEntity?>(null) }
     var pendingExport by remember { mutableStateOf<PackEntity?>(null) }
     var pendingEdit by remember { mutableStateOf<PackEntity?>(null) }
+    // 编辑：对话框打开时以当前项目为初值建一份表单副本；保存时统一按差异写库
+    var pendingEditForm by remember { mutableStateOf<PackForm?>(null) }
 
     // 编辑对话框内选启动器图标：Photo Picker 免存储权限（FR-03 同款通道）
     val packIconPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent(),
     ) { uri ->
+        val form = pendingEditForm
         val pack = pendingEdit
-        if (uri != null && pack != null) viewModel.setPackIcon(pack, uri)
+        if (uri != null && form != null && pack != null) viewModel.setPackIcon(pack, uri)
     }
 
     // 新建对话框内选启动器图标（同款免权限通道）；Uri 仅临时持有，落库后由引擎编码
-    var createIconUri by remember { mutableStateOf<Uri?>(null) }
     val createIconPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent(),
-    ) { uri -> if (uri != null) createIconUri = uri }
+    ) { uri -> createForm?.iconUri = uri }
+
+    /**
+     * 密钥库文件选择（新建/编辑统一走此通道）：选择 => 立即落盘到私有目录 =>
+     * 路径回填表单。SAF Uri 只在本次授权内可读，不能把 Uri 存表单留到打包再读。
+     */
+    val createKeystorePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent(),
+    ) { uri ->
+        val form = createForm ?: return@rememberLauncherForActivityResult
+        if (uri != null) {
+            viewModel.importKeystoreFile(uri) { result ->
+                result.fold(
+                    onSuccess = { form.applyKeystoreImport(it) },
+                    onFailure = { viewModel.postMessage("无法读取密钥库文件：${it.message}") },
+                )
+            }
+        }
+    }
+    val editKeystorePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent(),
+    ) { uri ->
+        val form = pendingEditForm ?: return@rememberLauncherForActivityResult
+        if (uri != null) {
+            viewModel.importKeystoreFile(uri) { result ->
+                result.fold(
+                    onSuccess = { form.applyKeystoreImport(it) },
+                    onFailure = { viewModel.postMessage("无法读取密钥库文件：${it.message}") },
+                )
+            }
+        }
+    }
 
     // 导出：SAF 建文档（无需存储权限），文件名建议带版本
     val exportLauncher = rememberLauncherForActivityResult(
@@ -124,7 +161,7 @@ fun PackListScreen(
         topBar = { TopAppBar(title = { Text("我的图标包") }) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showCreate = true }) {
+            FloatingActionButton(onClick = { createForm = PackForm() }) {
                 Icon(Icons.Default.Add, contentDescription = "新建图标包")
             }
         },
@@ -152,7 +189,11 @@ fun PackListScreen(
                         installLabel = state.installLabelOf(pack),
                         exporting = state.exportingPackId == pack.id,
                         onClick = { onOpenPack(pack.id) },
-                        onEdit = { pendingEdit = pack },
+                        onEdit = {
+                            pendingEdit = pack
+                            pendingEditForm = PackForm(pack)
+                        },
+                        onDuplicate = { viewModel.duplicatePack(pack) },
                         onExport = { pendingExport = pack },
                         onDelete = { pendingDelete = pack },
                     )
@@ -161,41 +202,57 @@ fun PackListScreen(
         }
     }
 
-    if (showCreate) {
+    // 新建（FR-02 全字段表单）：名称/版本/包名/抽屉可见性/图标/签名配置一次填齐
+    createForm?.let { form ->
         CreatePackDialog(
-            iconUri = createIconUri,
+            form = form,
             onPickIcon = { createIconPicker.launch("image/*") },
-            onClearIcon = { createIconUri = null },
-            onDismiss = {
-                showCreate = false
-                createIconUri = null
-            },
-            onCreate = { name ->
-                viewModel.createPack(name, createIconUri)
-                showCreate = false
-                createIconUri = null
+            onClearIcon = { form.iconUri = null },
+            onPickKeystore = { createKeystorePicker.launch("*/*") },
+            onClearKeystore = { form.clearKeystore() },
+            onDismiss = { createForm = null },
+            onCreate = {
+                viewModel.createPack(form.toDraft())
+                createForm = null
             },
         )
     }
 
-    // 编辑项目：名称 + 版本 + 包名 + 图标包自身的启动器图标（FR-02）
-    pendingEdit?.let { pack ->
+    // 编辑项目：与新建共用同一份 PackFormFields——兩边字段集合永远一致
+    if (pendingEdit != null && pendingEditForm != null) {
+        val form = pendingEditForm!!
+        val pack = pendingEdit!!
         EditPackDialog(
             pack = pack,
-            // 与设备上已安装的产物版本对比，用于提示"这个号会装不上"
+            form = form,
             installedVersionCode = state.installedVersions[pack.packageName],
-            onDismiss = { pendingEdit = null },
             onPickIcon = { packIconPicker.launch("image/*") },
             onClearIcon = { viewModel.clearPackIcon(pack) },
-            onShowInDrawerChange = { viewModel.setShowInDrawer(pack, it) },
-            onRename = { name ->
-                viewModel.renamePack(pack, name)
+            onPickKeystore = { editKeystorePicker.launch("*/*") },
+            onDismiss = {
                 pendingEdit = null
+                pendingEditForm = null
             },
-            onSetPackageName = { viewModel.setPackageName(pack, it) },
-            onSetVersion = { versionName, versionCodeInput ->
-                viewModel.setVersionInfo(pack, versionName, versionCodeInput)
+            onSave = {
+                if (form.trimmedName != pack.name) viewModel.renamePack(pack, form.trimmedName)
+                if (form.showInDrawer != pack.showInDrawer) {
+                    viewModel.setShowInDrawer(pack, form.showInDrawer)
+                }
+                // 与旧版编辑对话框同一语义：改动判定以"库里存没存显式号"为基准
+                val versionChanged = form.trimmedVersionName != pack.versionName ||
+                    (form.versionCodeParsed as? PackVersionRules.Parsed.Explicit)?.code
+                        ?.takeIf { it != pack.upcomingVersionCode } != pack.nextVersionCode
+                if (versionChanged) {
+                    viewModel.setVersionInfo(pack, form.trimmedVersionName, form.versionCodeInput)
+                }
+                if (form.trimmedPackageName != pack.packageName) {
+                    viewModel.setPackageName(pack, form.trimmedPackageName)
+                }
+                if (form.toSignConfig() != pack.toSignConfig()) {
+                    viewModel.setSigningConfig(pack, form.toSignConfig())
+                }
                 pendingEdit = null
+                pendingEditForm = null
             },
         )
     }
@@ -228,6 +285,9 @@ fun PackListScreen(
     }
 }
 
+/**
+ * 项目卡片。编辑是"→ 编辑对话框"的单入口；复制/导出/删除是即时操作。
+ */
 @Composable
 private fun PackItem(
     pack: PackEntity,
@@ -236,9 +296,11 @@ private fun PackItem(
     exporting: Boolean,
     onClick: () -> Unit,
     onEdit: () -> Unit,
+    onDuplicate: () -> Unit,
     onExport: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -290,6 +352,21 @@ private fun PackItem(
                     Icon(Icons.Default.Share, contentDescription = "导出产物")
                 }
             }
+            // 二级操作收进溢出菜单：图标池会随项目数增长，一级按钮不宜再排密
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "更多操作")
+                }
+                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                    DropdownMenuItem(
+                        text = { Text("复制项目") },
+                        onClick = {
+                            menuExpanded = false
+                            onDuplicate()
+                        },
+                    )
+                }
+            }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Default.Delete, contentDescription = "删除")
             }
@@ -298,66 +375,22 @@ private fun PackItem(
 }
 
 /**
- * 编辑项目（FR-02）：名称 + 版本 + 包名 + 图标包自身的启动器图标。
+ * 编辑项目对话框：与新建共用 [PackFormFields] 全字段表单。
  *
- * 图标是产物 APK 在启动器"图标主题"列表里显示的那个图标；不设置则沿用模板的
- * 125 字节占位 PNG，所有项目看起来都是同一个空白方块。
- *
- * 版本拆成两栏，因为它们是两个语义：
- * - **版本名**给人看，字符串随意（`2.1.0`、`2026.10`），写进清单 versionName；
- * - **下次打包版本号**给系统判断新旧，默认自动在最近版本上 +1（输入框预填自动值，
- *  不动它就什么都不改）。填一个低于已装版本的号，覆盖安装会被系统直接拒绝——
- *  所以这里就地给出警告，而不是等安装失败再排查。
- *
- * @param installedVersionCode 设备上已安装产物的版本号；null = 未安装（无须提示降级）
+ * save 走屏幕回调的差异写库（图标与抽屉开关等"即时生效"操作除外）；版本降级
+ * 警告、包名/版本校验等逻辑全部内嵌在表单字段里。
  */
 @Composable
 private fun EditPackDialog(
     pack: PackEntity,
+    form: PackForm,
     installedVersionCode: Long?,
-    onDismiss: () -> Unit,
     onPickIcon: () -> Unit,
     onClearIcon: () -> Unit,
-    onShowInDrawerChange: (Boolean) -> Unit,
-    onRename: (String) -> Unit,
-    onSetPackageName: (String) -> Unit,
-    onSetVersion: (versionName: String, versionCodeInput: String) -> Unit,
+    onPickKeystore: () -> Unit,
+    onDismiss: () -> Unit,
+    onSave: (form: PackForm) -> Unit,
 ) {
-    var name by remember(pack.id) { mutableStateOf(pack.name) }
-    var packageName by remember(pack.id) { mutableStateOf(pack.packageName) }
-    var versionName by remember(pack.id) { mutableStateOf(pack.versionName) }
-    // 预填"下次打包将使用的版本号"：显式指定过就用它，否则是自动递增的下一个
-    var versionCodeInput by remember(pack.id) {
-        mutableStateOf(pack.upcomingVersionCode.toString())
-    }
-
-    val trimmedPackage = packageName.trim()
-    // 实时校验：非法包名会让产物装不上，不能让用户带着它点保存
-    val packageIssue = PackageNameRules.validate(trimmedPackage)
-    val packageChanged = trimmedPackage != pack.packageName
-
-    val trimmedVersionName = versionName.trim()
-    val versionNameIssue = PackVersionRules.validateName(trimmedVersionName)
-    val versionCodeParsed = PackVersionRules.parseCode(versionCodeInput)
-    val versionCodeIssue = if (versionCodeParsed is PackVersionRules.Parsed.Invalid) {
-        PackVersionRules.Issue.CODE_NOT_POSITIVE.message
-    } else {
-        null
-    }
-    val nextVersionCode = when (versionCodeParsed) {
-        PackVersionRules.Parsed.Auto -> pack.upcomingVersionCode
-        is PackVersionRules.Parsed.Explicit -> versionCodeParsed.code
-        PackVersionRules.Parsed.Invalid -> null
-    }
-    val versionChanged = trimmedVersionName != pack.versionName ||
-        (when (versionCodeParsed) {
-            PackVersionRules.Parsed.Auto -> null
-            is PackVersionRules.Parsed.Explicit -> versionCodeParsed.code.takeIf {
-                it != pack.upcomingVersionCode
-            }
-            PackVersionRules.Parsed.Invalid -> null
-        }) != pack.nextVersionCode
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("编辑图标包") },
@@ -365,126 +398,22 @@ private fun EditPackDialog(
             Column(
                 modifier = Modifier
                     .verticalScroll(rememberScrollState())
-                    .heightIn(max = 420.dp),
+                    .heightIn(max = 460.dp),
             ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("图标包名称") },
-                    singleLine = true,
+                PackFormFields(
+                    form = form,
+                    installedVersionCode = installedVersionCode,
+                    currentPackVersionCode = pack.versionCode,
+                    onPickKeystore = onPickKeystore,
+                    onClearKeystore = { form.clearKeystore() },
+                    iconContent = { PackIconThumbnail(path = pack.iconPath) },
+                    onPickIcon = onPickIcon,
+                    onClearIcon = if (pack.iconPath != null) onClearIcon else null,
                 )
-                Spacer(modifier = Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = versionName,
-                    onValueChange = { versionName = it },
-                    label = { Text("版本名") },
-                    singleLine = true,
-                    isError = versionNameIssue != null,
-                    supportingText = {
-                        Text(
-                            text = versionNameIssue?.message
-                                ?: "显示在系统的应用信息里；版本号与版本名是两件事",
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    },
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = versionCodeInput,
-                    onValueChange = { versionCodeInput = it.filter(Char::isDigit).take(10) },
-                    label = { Text("下次打包版本号") },
-                    singleLine = true,
-                    isError = versionCodeIssue != null,
-                    supportingText = {
-                        when {
-                            versionCodeIssue != null -> Text(
-                                text = versionCodeIssue,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                            // 低于已装版本：系统会以 INSTALL_FAILED_VERSION_DOWNGRADE 拒绝安装，
-                            // 这个错在系统提示里只写包名不写原因，必须在填写时就拦住
-                            nextVersionCode != null && installedVersionCode != null &&
-                                nextVersionCode <= installedVersionCode -> Text(
-                                text = "低于设备上已安装的 v$installedVersionCode，覆盖安装会被系统拒绝（需先卸载）",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                            nextVersionCode != null && nextVersionCode <= pack.versionCode -> Text(
-                                text = "低于上次打包的 v${pack.versionCode}，装回旧版本同样会被拒绝",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                            else -> Text(
-                                text = "下次打包将使用 v$nextVersionCode；清空则回到自动递增",
-                                style = MaterialTheme.typography.labelSmall,
-                            )
-                        }
-                    },
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = packageName,
-                    onValueChange = { packageName = it },
-                    label = { Text("包名") },
-                    singleLine = true,
-                    isError = packageIssue != null,
-                    supportingText = {
-                        Text(
-                            text = packageIssue?.message
-                                ?: ("每个图标包需要独立包名才能在系统里共存；改包名后要重新打包安装，" +
-                                        "旧包名会作为独立应用留在设备上（可自行卸载）"),
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    },
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "图标（在启动器里显示）",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    PackIconThumbnail(path = pack.iconPath)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    TextButton(onClick = onPickIcon) { Text("选择图片") }
-                    if (pack.iconPath != null) {
-                        TextButton(onClick = onClearIcon) { Text("清除") }
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
-                        checked = pack.showInDrawer,
-                        onCheckedChange = onShowInDrawerChange,
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(text = "在应用抽屉显示", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            text = if (pack.showInDrawer) {
-                                "抽屉里能看到这个图标包，点开是启用提示"
-                            } else {
-                                "只作为主题资源，不占抽屉位置"
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = {
-                    onRename(name)
-                    if (versionChanged) onSetVersion(trimmedVersionName, versionCodeInput)
-                    // 有改动才写库，避免每次编辑都触发一次无谓的占用检查与状态刷新
-                    if (packageChanged) onSetPackageName(trimmedPackage)
-                },
-                enabled = name.isNotBlank() && packageIssue == null &&
-                    versionNameIssue == null && versionCodeIssue == null,
-            ) { Text("保存") }
+            TextButton(onClick = { onSave(form) }, enabled = form.isValid) { Text("保存") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
     )
@@ -533,15 +462,21 @@ private fun PackIconThumbnail(path: String? = null, uri: Uri? = null) {
     }
 }
 
+/**
+ * 新建项目对话框（FR-02 全字段版）：与编辑共用 [PackFormFields]，
+ * 新增字段不再出现"编辑能改、新建不能选"的错位。创建校验集中在仓库层，
+ * 表单的即时校验只为提前拦住用户、让保存按钮的表达准确。
+ */
 @Composable
 private fun CreatePackDialog(
-    iconUri: Uri?,
+    form: PackForm,
     onPickIcon: () -> Unit,
     onClearIcon: () -> Unit,
+    onPickKeystore: () -> Unit,
+    onClearKeystore: () -> Unit,
     onDismiss: () -> Unit,
-    onCreate: (String) -> Unit,
+    onCreate: () -> Unit,
 ) {
-    var name by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("新建图标包") },
@@ -549,35 +484,20 @@ private fun CreatePackDialog(
             Column(
                 modifier = Modifier
                     .verticalScroll(rememberScrollState())
-                    .heightIn(max = 420.dp),
+                    .heightIn(max = 460.dp),
             ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("图标包名称") },
-                    singleLine = true,
+                PackFormFields(
+                    form = form,
+                    onPickKeystore = onPickKeystore,
+                    onClearKeystore = onClearKeystore,
+                    iconContent = { PackIconThumbnail(uri = form.iconUri) },
+                    onPickIcon = onPickIcon,
+                    onClearIcon = if (form.iconUri != null) onClearIcon else null,
                 )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "图标（在启动器里显示，可选）",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    PackIconThumbnail(uri = iconUri)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    TextButton(onClick = onPickIcon) { Text("选择图片") }
-                    if (iconUri != null) {
-                        TextButton(onClick = onClearIcon) { Text("清除") }
-                    }
-                }
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = { onCreate(name) },
-                enabled = name.isNotBlank(),
-            ) { Text("创建") }
+            TextButton(onClick = onCreate, enabled = form.isValid) { Text("创建") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
     )

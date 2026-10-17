@@ -33,13 +33,23 @@ class ApkSignerWrapper {
      *
      * @param inputApk 未签名的 APK
      * @param outputApk 签名产物输出路径（不得与输入相同）
-     * @param identity 设备端签名身份
+     * @param identity 签名身份（设备端生成或用户导入）
+     * @param schemes 要启用的签名方案；绝大多数场景保留默认（三方案同签），
+     *  覆盖安装失败或启动器拒绝签名时可按需开关——由调用方（UI）持久化并传递。
      * @return 签名者主题摘要（如 "CN=IconPacker Device Signer"），供结果页展示
      * @throws IOException 签名失败或签名后校验不通过
      */
-    fun sign(inputApk: File, outputApk: File, identity: SigningIdentity): String {
+    fun sign(
+        inputApk: File,
+        outputApk: File,
+        identity: SigningIdentity,
+        schemes: SigningSchemes = SigningSchemes(),
+    ): String {
         require(inputApk != outputApk) { "输入与输出不能是同一文件" }
         require(inputApk.isFile) { "输入 APK 不存在：${inputApk.path}" }
+        require(schemes.v1 || schemes.v2 || schemes.v3) {
+            "至少需要启用一种签名方案"
+        }
 
         val signerConfig = ApkSigner.SignerConfig.Builder(
             identity.name,
@@ -50,9 +60,9 @@ class ApkSignerWrapper {
         val signer = ApkSigner.Builder(listOf(signerConfig))
             .setInputApk(inputApk)
             .setOutputApk(outputApk)
-            .setV1SigningEnabled(true)
-            .setV2SigningEnabled(true)
-            .setV3SigningEnabled(true)
+            .setV1SigningEnabled(schemes.v1)
+            .setV2SigningEnabled(schemes.v2)
+            .setV3SigningEnabled(schemes.v3)
             .setMinSdkVersion(MIN_SDK)
             .build()
         signer.sign()
@@ -86,3 +96,17 @@ class ApkSignerWrapper {
         private const val IDENTITY_FALLBACK = "unknown"
     }
 }
+
+/**
+ * 签名方案组合。默认三方案同签（与历史行为一致）：
+ * - v1（JAR）：Android 7.0 以下唯一方案；
+ * - v2：Android 7.0+ 主力，整包校验、防裁剪；
+ * - v3：Android 9+ 支持签名证书轮换。
+ *
+ * 至少需要启用一种（由 [ApkSignerWrapper.sign] 与 PackRequest 双重校验）。
+ */
+data class SigningSchemes(
+    val v1: Boolean = true,
+    val v2: Boolean = true,
+    val v3: Boolean = true,
+)

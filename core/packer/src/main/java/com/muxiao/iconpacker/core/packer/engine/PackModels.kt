@@ -1,6 +1,7 @@
 package com.muxiao.iconpacker.core.packer.engine
 
 import com.muxiao.iconpacker.core.packer.sign.SigningKeyProvider
+import com.muxiao.iconpacker.core.packer.sign.SigningSchemes
 
 /** 一条映射：应用组件 → 图标槽位号（槽位号 n 对应模板资源 ic_%04d 格式名） */
 data class IconMapping(
@@ -56,6 +57,11 @@ data class PackRequest(
      * 规则与派生见 [PackageNameRules]。
      */
     val packageName: String = TemplateInfo.PACKAGE_NAME,
+    /**
+     * 要启用的 APK 签名方案组合。默认三方案同签（历史行为）；用户可在项目
+     * 签名设置里按需开关（个别启动器/平台对某些方案组合有兼容癖好时）。
+     */
+    val signingSchemes: SigningSchemes = SigningSchemes(),
 ) {
     init {
         require(packName.isNotBlank()) { "图标包名称不能为空" }
@@ -63,6 +69,9 @@ data class PackRequest(
         require(versionName.isNotBlank()) { "版本名不能为空（清单里的 versionName 不允许空串）" }
         require(mappings.isNotEmpty()) { "至少需要一条映射" }
         require(icons.isNotEmpty()) { "至少需要一个图标" }
+        require(signingSchemes.v1 || signingSchemes.v2 || signingSchemes.v3) {
+            "至少需要启用一种签名方案"
+        }
         PackageNameRules.requireValid(packageName)
         val slots = mappings.map { it.slot }.toSet()
         val provided = icons.map { it.slot }.toSet()
@@ -88,6 +97,7 @@ data class PackRequest(
         if (signingKeyProvider != other.signingKeyProvider) return false
         if (!packIconBytes.contentEquals(other.packIconBytes)) return false
         if (packageName != other.packageName) return false
+        if (signingSchemes != other.signingSchemes) return false
 
         return true
     }
@@ -104,6 +114,7 @@ data class PackRequest(
         result = 31 * result + signingKeyProvider.hashCode()
         result = 31 * result + (packIconBytes?.contentHashCode() ?: 0)
         result = 31 * result + packageName.hashCode()
+        result = 31 * result + signingSchemes.hashCode()
         return result
     }
 }

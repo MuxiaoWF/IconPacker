@@ -19,6 +19,7 @@ import java.util.zip.ZipInputStream
  * files/
  * ├── icons/<packId>/<slot>__<原始名> 导入的图标原件（导入时压缩，见 ImportCompressor）
  * ├── template/template.apk               从 assets 拷贝的模板（首次打包时）
+ * ├── keystores/ks_<ts>.keystore          用户导入的签名密钥库（跨项目共享，v7）
  * └── outputs/<packId>/pack-v<N>.apk      打包产物
  * ```
  * 全部位于应用私有目录：卸载即清除（docs/README.md），无需任何存储权限。
@@ -40,6 +41,14 @@ class IconFileStore(
     private val filesRoot: File get() = context.filesDir
 
     fun iconsDir(packId: Long): File = File(filesRoot, "icons/$packId").apply { mkdirs() }
+
+    /**
+     * 用户导入的签名密钥库目录。
+     *
+     * 与 icons/ 分开：密钥库**跨项目共享**（复制项目引用同一路径），生命周期
+     * 由"是否还有项目引用"决定（见 PackRepository 的孤儿清理），不能按项目目录组织。
+     */
+    fun keystoresDir(): File = File(filesRoot, "keystores").apply { mkdirs() }
 
     fun templateApk(): File = File(filesRoot, "template/template.apk")
 
@@ -250,6 +259,27 @@ class IconFileStore(
 
     /** 删除单个文件（还原编辑时清理产物；忽略不存在的路径） */
     suspend fun deleteFile(path: String) {
+        withContext(Dispatchers.IO) { File(path).delete() }
+    }
+
+    /**
+     * 把用户经 SAF 选中的密钥库文件落地到私有目录，返回存储路径。
+     *
+     * 落地时机：SAF 的 content Uri 只在本次授权内可读，打包是数秒后的
+     * 独立流程——必须在用户选文件时就地拷贝，不能把 Uri 存进数据库留到打包。
+     * 文件名用时间戳：同一密钥库多项目/多次导入各自成文件，覆盖会破坏"复制项目
+     * 引用同一路径"的共享约定。
+     */
+    suspend fun importKeystore(uri: Uri): String = withContext(Dispatchers.IO) {
+        val target = File(keystoresDir(), "ks_${System.currentTimeMillis()}.keystore")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            target.outputStream().use { output -> input.copyTo(output) }
+        } ?: error("无法读取所选密钥库文件：$uri")
+        target.absolutePath
+    }
+
+    /** 删除导入的密钥库文件（仅当已无项目引用时由仓库层调用） */
+    suspend fun deleteKeystore(path: String) {
         withContext(Dispatchers.IO) { File(path).delete() }
     }
 

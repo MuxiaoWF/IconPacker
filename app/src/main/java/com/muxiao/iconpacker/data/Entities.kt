@@ -29,6 +29,20 @@ import com.muxiao.iconpacker.domain.PackVersionRules
  *  否则产物在系统里互相覆盖（详见 `PackageNameRules`）。
  *  `@ColumnInfo(defaultValue)` 的值必须与迁移里 ALTER TABLE 的 DEFAULT
  *  严格一致，否则 Room 会在打开库时判定"迁移未正确执行"而抛异常。
+ *
+ * 签名配置族（v7）：让产物签名可由用户逐项目自定义——用谁的密钥、v1 签名者名与
+ * 签名方案组合，都随项目持久化（同一份配置可被"复制项目"带走到新项目）。
+ * @param signMode 签名模式：[SIGN_MODE_DEVICE]（默认，设备 Keystore 密钥）或
+ *        [SIGN_MODE_IMPORTED]（用户导入的密钥库文件）。常量族而不是 enum：
+ *        Room 存 int 稳定，且取值语义写在常量 doc 里。
+ * @param keystorePath 导入密钥库在私有目录的全路径（全局 `keystores/` 目录，
+ *        跨项目共享——复制项目直接引用同一路径，不重复落盘）；signMode=0 时忽略
+ * @param keystorePassword 密钥库打开密码。明文存于应用私有数据库，是导入密钥
+ *        场景下的可接受折衷（详见 ImportedKeystoreProvider 头注释）
+ * @param keystoreAlias 私钥条目别名
+ * @param keyPassword 私钥密码；空 = 沿用 keystorePassword
+ * @param signerName v1 签名者名（META-INF 下 .SF/.RSA 文件名）；空 = 各模式默认值
+ * @param signSchemeV1/V2/V3 签名方案开关，默认全开（历史行为）
  */
 @Entity(tableName = "packs")
 data class PackEntity(
@@ -47,6 +61,19 @@ data class PackEntity(
     @ColumnInfo(defaultValue = "'1.0'")
     val versionName: String = "1.0",
     val nextVersionCode: Int? = null,
+    @ColumnInfo(defaultValue = "0")
+    val signMode: Int = SIGN_MODE_DEVICE,
+    val keystorePath: String? = null,
+    val keystorePassword: String? = null,
+    val keystoreAlias: String? = null,
+    val keyPassword: String? = null,
+    val signerName: String? = null,
+    @ColumnInfo(defaultValue = "1")
+    val signSchemeV1: Boolean = true,
+    @ColumnInfo(defaultValue = "1")
+    val signSchemeV2: Boolean = true,
+    @ColumnInfo(defaultValue = "1")
+    val signSchemeV3: Boolean = true,
 ) {
     /**
      * 下次打包将使用的版本号：用户显式指定的优先，否则在最近版本上自动 +1。
@@ -57,7 +84,46 @@ data class PackEntity(
  */
     val upcomingVersionCode: Int
         get() = nextVersionCode ?: PackVersionRules.autoNext(versionCode)
+
+    companion object {
+        /** 设备端生成密钥（AndroidKeyStore，不可导出） */
+        const val SIGN_MODE_DEVICE = 0
+
+        /** 用户导入的密钥库文件（跨设备同签名身份） */
+        const val SIGN_MODE_IMPORTED = 1
+    }
 }
+
+/**
+ * 项目签名配置的纯值视图（UI ↔ [PackEntity] ↔ 打包引擎之间的传输对象）。
+ *
+ * 空串与 null 的语义：`signerName` 空表示"用该模式默认签名者名"，
+ * 其余导入参数仅在 [signMode] 为 `SIGN_MODE_IMPORTED` 时有意义。
+ */
+data class PackSignConfig(
+    val signMode: Int = PackEntity.SIGN_MODE_DEVICE,
+    val keystorePath: String = "",
+    val keystorePassword: String = "",
+    val keystoreAlias: String = "",
+    val keyPassword: String = "",
+    val signerName: String = "",
+    val schemeV1: Boolean = true,
+    val schemeV2: Boolean = true,
+    val schemeV3: Boolean = true,
+)
+
+/** 读取项目的签名配置（编辑对话框回填与"改动检测"共用同一视图，避免字段散抄） */
+fun PackEntity.toSignConfig(): PackSignConfig = PackSignConfig(
+    signMode = signMode,
+    keystorePath = keystorePath.orEmpty(),
+    keystorePassword = keystorePassword.orEmpty(),
+    keystoreAlias = keystoreAlias.orEmpty(),
+    keyPassword = keyPassword.orEmpty(),
+    signerName = signerName.orEmpty(),
+    schemeV1 = signSchemeV1,
+    schemeV2 = signSchemeV2,
+    schemeV3 = signSchemeV3,
+)
 
 /**
  * 一条应用映射：组件 → 图标槽位（生成 appfilter.xml 的条目，docs/pack-engine.md）。

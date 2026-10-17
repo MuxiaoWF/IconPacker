@@ -86,6 +86,38 @@ interface PackDao {
     suspend fun setPackageName(packId: Long, packageName: String, now: Long)
 
     /**
+     * 设置签名配置（v7）。
+     *
+     * 一次性整组写入而非逐字段：签名字段之间有联动（换密钥库要同步清别名与密码），
+     * 逐字段写容易出现"密钥库换了、密码还是旧的"的半更新态。
+     * 校验（文件存在、别名非空等）由仓库层在调用前完成。
+     */
+    @Query(
+        "UPDATE packs SET signMode = :signMode, keystorePath = :keystorePath, " +
+            "keystorePassword = :keystorePassword, keystoreAlias = :keystoreAlias, " +
+            "keyPassword = :keyPassword, signerName = :signerName, " +
+            "signSchemeV1 = :schemeV1, signSchemeV2 = :schemeV2, signSchemeV3 = :schemeV3, " +
+            "updatedAt = :now WHERE id = :packId",
+    )
+    suspend fun setSigningConfig(
+        packId: Long,
+        signMode: Int,
+        keystorePath: String?,
+        keystorePassword: String?,
+        keystoreAlias: String?,
+        keyPassword: String?,
+        signerName: String?,
+        schemeV1: Boolean,
+        schemeV2: Boolean,
+        schemeV3: Boolean,
+        now: Long,
+    )
+
+    /** 引用某个导入密钥库文件的项目数（删项目后清理孤儿密钥文件用） */
+    @Query("SELECT COUNT(*) FROM packs WHERE keystorePath = :path")
+    suspend fun countUsingKeystore(path: String): Int
+
+    /**
      * 除自己以外占用同一包名的项目。
      *
      * 两个项目同包名 = 两套产物在系统里争同一个位置，后装的会覆盖先装的，
@@ -97,14 +129,21 @@ interface PackDao {
     /**
      * 新建项目并分配包名（同一事务）。
      *
-     * 包名由自增 id 派生（id 唯一且不变，因此派生结果天然不重复），
-     * 也就必须先插入拿到 id 再回写——放一个事务里，避免"项目已存在但包名还是默认值"
+     * 包名默认由自增 id 派生（id 唯一且不变，因此派生结果天然不重复），
+     * 必须先插入拿到 id 再回写——放一个事务里，避免"项目已存在但包名还是默认值"
      * 的中间态被列表查询看到。
+     *
+     * [customPackageName] 非空时改用它（新建表单允许用户直接指定包名；语法校验与
+     * 占用检查由仓库层在调用前完成，本方法只做写入）。
      */
     @Transaction
-    suspend fun insertWithPackage(pack: PackEntity, now: Long): Long {
+    suspend fun insertWithPackage(
+        pack: PackEntity,
+        now: Long,
+        customPackageName: String? = null,
+    ): Long {
         val id = insert(pack)
-        setPackageName(id, PackageNameRules.suggest(id), now)
+        setPackageName(id, customPackageName ?: PackageNameRules.suggest(id), now)
         return id
     }
 }

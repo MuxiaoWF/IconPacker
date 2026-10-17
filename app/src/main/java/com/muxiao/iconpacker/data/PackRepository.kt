@@ -12,6 +12,9 @@ import com.muxiao.iconpacker.core.packer.engine.PackResult
 import com.muxiao.iconpacker.core.packer.engine.SlotIcon
 import com.muxiao.iconpacker.core.packer.engine.ZipIconPlanner
 import com.muxiao.iconpacker.core.packer.sign.AndroidKeystoreKeyProvider
+import com.muxiao.iconpacker.core.packer.sign.ImportedKeystoreProvider
+import com.muxiao.iconpacker.core.packer.sign.SigningKeyProvider
+import com.muxiao.iconpacker.core.packer.sign.SigningSchemes
 import com.muxiao.iconpacker.domain.AppMatcher
 import com.muxiao.iconpacker.domain.ImportBinder
 import com.muxiao.iconpacker.domain.ImportOutcome
@@ -21,6 +24,7 @@ import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * 图标包项目仓库：数据库 + 文件 + 打包引擎的唯一编排点。
@@ -36,8 +40,6 @@ class PackRepository(
     private val appInfoProvider: AppInfoProvider,
     private val apkBuilder: ApkBuilder = ApkBuilder(),
     private val iconProcessor: IconProcessor = IconProcessor(),
-    private val signingKeyProvider: com.muxiao.iconpacker.core.packer.sign.SigningKeyProvider =
-        AndroidKeystoreKeyProvider(),
 ) {
 
     // ---- 观察（UI 响应式数据源） ----
@@ -56,18 +58,119 @@ class PackRepository(
     // ---- 项目（FR-02） ----
 
     /**
-     * 新建项目。
+     * 新建项目（完整表单版，FR-02）。
      *
-     * 项目诞生即分配唯一包名（由 id 派生，见 [PackDao.insertWithPackage]）——
-     * 包名是产物在系统里的身份，不分配的后果是第二个图标包把第一个覆盖掉。
+     * 项目诞生即分配包名：用户显式提供的包名优先（否则由 id 派生，见
+     * [PackDao.insertWithPackage]）。包名是产物在系统里的身份，不分配的后果
+     * 是第二个图标包把第一个覆盖掉。
+     *
+     * 全部字段在落库前校验（包名语法/占用、版本名/号、签名配置），让"新建一次
+     * 成功"与"编辑对话框"享有同一条校验管线——任何一边漏校验都会产出装不上的产物。
+     *
+     * @param packageName 用户显式包名；null 或空白 = 由 id 自动派生
+     * @param sign 签名配置（模式/密钥库/签名者名/方案开关）
      */
-    suspend fun createPack(name: String): Long {
+    suspend fun createPack(
+        name: String,
+        packageName: String?,
+        versionName: String,
+        nextVersionCode: Int?,
+        showInDrawer: Boolean,
+        sign: PackSignConfig,
+    ): Long {
+        val trimmedName = name.trim()
+        val trimmedVersionName = versionName.trim()
+        PackVersionRules.validateName(trimmedVersionName)?.let { throw IllegalArgumentException(it.message) }
+        PackVersionRules.validateCode(nextVersionCode)?.let { throw IllegalArgumentException(it.message) }
+        requireSignConfig(sign)
+
+        val customPackage = packageName?.trim()?.takeIf { it.isNotEmpty() }
+        customPackage?.let { pkg ->
+            PackageNameRules.requireValid(pkg)
+            // 此时新项目尚未插库，排除 id 用 -1 即可拦截"与既有项目撞名"
+            packDao.findOtherWithPackageName(pkg, -1L)?.let { other ->
+                throw IllegalArgumentException("包名已被项目「${other.name}」占用")
+            }
+        }
+
         val now = System.currentTimeMillis()
         return packDao.insertWithPackage(
-            PackEntity(name = name, createdAt = now, updatedAt = now),
+            PackEntity(
+                name = trimmedName,
+                versionName = trimmedVersionName,
+                nextVersionCode = nextVersionCode,
+                showInDrawer = showInDrawer,
+                createdAt = now,
+                updatedAt = now,
+                signMode = sign.signMode,
+                keystorePath = sign.keystorePath.ifEmpty { null },
+                keystorePassword = sign.keystorePassword.ifEmpty { null },
+                keystoreAlias = sign.keystoreAlias.ifEmpty { null },
+                keyPassword = sign.keyPassword.ifEmpty { null },
+                signerName = sign.signerName.ifEmpty { null },
+                signSchemeV1 = sign.schemeV1,
+                signSchemeV2 = sign.schemeV2,
+                signSchemeV3 = sign.schemeV3,
+            ),
             now,
+            customPackage,
         )
     }
+
+    /**
+     * 复制项目（FR-02 宣称 yet 此前无实现）。
+     *
+     * 复制范围与理由：
+     * - **配置全部继承**（版本/包名 / 抽屉开关 / 签名配置）——复制场景是"换个名字
+     *  再发一个变体"，逐项重填没有意义；导入密钥库文件是**共享引用**，不重复落盘，
+     *  新项目与源项目指向同一个私有目录文件（见 [IconFileStore.keystoresDir]）；
+     * - **图标池全量深拷贝**：原图 + 编辑产物 + 启动器图标逐文件拷入新项目目录，
+     *  数据库行带新路径写入。槽位号沿用（映射无须变更）；
+     * - **打包状态清零**：lastPackedAt 重置（产物目录本来就为空），版本号原样
+     *  继承——首次打包自动用即将生效的下一个号，与"接着上个项目继续排版本"的
+     *  直觉一致；
+     * - **包名由新项目 id 重新派生**：两个产物同包名会互相覆盖，复制恰恰是为了
+     *  得到一个并列的身份。
+     *
+     * 文件拷贝失败不静默：项目已落库但图标缺失时抛出，用户可删除后重试。
+     */
+    suspend fun duplicatePack(sourceId: Long): Long = withContext(Dispatchers.IO) {
+        val source = packDao.getById(sourceId) ?: error("项目不存在：$sourceId")
+        val now = System.currentTimeMillis()
+        val newId = packDao.insertWithPackage(
+            source.copy(name = source.name + " 副本", createdAt = now, updatedAt = now, lastPackedAt = null),
+            now,
+        )
+
+        source.iconPath?.let { path ->
+            val copied = copyInto(File(path), fileStore.iconsDir(newId), "pack_icon.png")
+            if (copied != null) packDao.setIcon(newId, copied, now)
+        }
+
+        val assets = assetDao.getByPack(sourceId)
+        assetDao.insertAll(assets.map { asset ->
+            asset.copy(
+                id = 0,
+                packId = newId,
+                sourcePath = copyInto(File(asset.sourcePath), fileStore.iconsDir(newId), fileNameOf(asset.sourcePath))
+                    ?: error("复制原图失败：${asset.sourcePath}"),
+                editedPath = asset.editedPath
+                    ?.let { copyInto(File(it), fileStore.iconsDir(newId), fileNameOf(it)) },
+            )
+        })
+        mappingDao.insertAll(mappingDao.getByPack(sourceId).map { it.copy(id = 0, packId = newId) })
+        newId
+    }
+
+    /** 把文件拷入目标目录（同名覆盖），返回新路径；源文件不存在返回 null */
+    private fun copyInto(source: File, dir: File, fileName: String): String? {
+        if (!source.isFile) return null
+        val dest = File(dir, fileName)
+        source.copyTo(dest, overwrite = true)
+        return dest.absolutePath
+    }
+
+    private fun fileNameOf(path: String): String = path.substringAfterLast('/').substringAfterLast('\\')
 
     suspend fun renamePack(packId: Long, name: String) {
         packDao.rename(packId, name, System.currentTimeMillis())
@@ -119,9 +222,14 @@ class PackRepository(
     }
 
     suspend fun deletePack(packId: Long) {
+        val pack = packDao.getById(packId)
         packDao.getById(packId)?.let {
             packDao.delete(it) // Room 级联删除映射与图标记录
             fileStore.deletePackFiles(packId)
+        }
+        // 导入密钥库是跨项目共享文件，删除项目后可能还有人引用，数一下再清理
+        pack?.keystorePath?.takeIf { pack.signMode == PackEntity.SIGN_MODE_IMPORTED }?.let { path ->
+            if (packDao.countUsingKeystore(path) == 0) fileStore.deleteKeystore(path)
         }
     }
 
@@ -139,6 +247,67 @@ class PackRepository(
         PackVersionRules.validateCode(nextVersionCode)
             ?.let { throw IllegalArgumentException(it.message) }
         packDao.setVersionInfo(packId, name, nextVersionCode, System.currentTimeMillis())
+    }
+
+    /** 把用户经 SAF 选中的密钥库文件落地到私有目录（编辑/新建对话框共用），返回存储路径 */
+    suspend fun importKeystoreFile(uri: Uri): String = fileStore.importKeystore(uri)
+
+    /**
+     * 设置签名配置（v7）。
+     *
+     * 整组写入（见 [PackDao.setSigningConfig]）。若把"导入密钥库"切回设备密钥或
+     * 换了密钥库文件，旧文件不再被本项目引用——数一遍全库引用，归零即删除文件，
+     * 与"删除图标连文件一起删"是同一条资源纪律。
+     */
+    suspend fun setSigningConfig(packId: Long, config: PackSignConfig) {
+        requireSignConfig(config)
+        val previous = packDao.getById(packId)
+        val orphanPath = orphanKeystorePathOf(previous, config)
+        packDao.setSigningConfig(
+            packId = packId,
+            signMode = config.signMode,
+            keystorePath = config.keystorePath.ifEmpty { null },
+            keystorePassword = config.keystorePassword.ifEmpty { null },
+            keystoreAlias = config.keystoreAlias.ifEmpty { null },
+            keyPassword = config.keyPassword.ifEmpty { null },
+            signerName = config.signerName.ifEmpty { null },
+            schemeV1 = config.schemeV1,
+            schemeV2 = config.schemeV2,
+            schemeV3 = config.schemeV3,
+            now = System.currentTimeMillis(),
+        )
+        orphanPath?.let { path ->
+            if (packDao.countUsingKeystore(path) == 0) fileStore.deleteKeystore(path)
+        }
+    }
+
+    /** 保存前校验签名配置；失败原因文案直接面向用户 */
+    private fun requireSignConfig(config: PackSignConfig) {
+        if (config.signMode == PackEntity.SIGN_MODE_IMPORTED) {
+            if (config.keystorePath.isBlank()) {
+                throw IllegalArgumentException("已选择导入密钥库，但还没有选择密钥库文件")
+            }
+            if (config.keystoreAlias.isBlank()) {
+                throw IllegalArgumentException("已选择导入密钥库，但还没有填写密钥别名")
+            }
+        }
+        // 签名方案开关对两种模式一视同仁：全关等价于产出一个没法验签的包
+        if (!(config.schemeV1 || config.schemeV2 || config.schemeV3)) {
+            throw IllegalArgumentException("至少需要保留一种签名方案")
+        }
+    }
+
+    /** 旧项目引用的导入密钥库中，这次保存后不再被引用的那一个文件路径（无则 null） */
+    private fun orphanKeystorePathOf(previous: PackEntity?, config: PackSignConfig): String? {
+        val path = previous
+            ?.takeIf { it.signMode == PackEntity.SIGN_MODE_IMPORTED }
+            ?.keystorePath
+            ?.takeIf { it.isNotBlank() } ?: return null
+        val nextPath = config
+            .takeIf { it.signMode == PackEntity.SIGN_MODE_IMPORTED }
+            ?.keystorePath
+            ?.takeIf { it.isNotBlank() }
+        return path.takeIf { it != nextPath }
     }
 
     // ---- 图标导入（FR-03） ----
@@ -403,7 +572,36 @@ class PackRepository(
             icons = assets.map { SlotIcon(it.slot, it.editedPath ?: it.sourcePath) },
             templateApkPath = fileStore.ensureTemplate(),
             outputPath = fileStore.outputApk(packId, versionCode).absolutePath,
-            signingKeyProvider = signingKeyProvider,
+            // 签名身份逐项目装配（v7）：设备密钥可换签名者名；导入密钥按项目配置解析
+            signingKeyProvider = signingProviderFor(pack),
+            signingSchemes = SigningSchemes(pack.signSchemeV1, pack.signSchemeV2, pack.signSchemeV3),
+        )
+    }
+
+    /**
+     * 按项目配置装配签名密钥提供者（v7）。
+     *
+     * 设备密钥是共享资产（同一次生成长期复用），只有签名者名可按项目覆盖；
+     * 导入密钥项目的文件/密码/别名都来自该项目的持久化配置，解析失败直接抛出——
+     * 原因要原样出现在打包失败信息里，"用谁的密钥签名"不允许静默换轨。
+     */
+    private fun signingProviderFor(pack: PackEntity): SigningKeyProvider = when (pack.signMode) {
+        PackEntity.SIGN_MODE_IMPORTED -> {
+            val path = pack.keystorePath
+            require(!path.isNullOrBlank()) { "已选择导入密钥库，但尚未选择密钥库文件；请在项目编辑里补全" }
+            require(!pack.keystoreAlias.isNullOrBlank()) { "已选择导入密钥库，但尚未填写密钥别名；请在项目编辑里补全" }
+            ImportedKeystoreProvider(
+                keystorePath = path,
+                storePassword = pack.keystorePassword.orEmpty(),
+                alias = pack.keystoreAlias!!,
+                keyPassword = pack.keyPassword.orEmpty(),
+                signerName = pack.signerName?.takeIf { it.isNotBlank() }
+                    ?: ImportedKeystoreProvider.DEFAULT_SIGNER_NAME,
+            )
+        }
+        else -> AndroidKeystoreKeyProvider(
+            signerName = pack.signerName?.takeIf { it.isNotBlank() }
+                ?: AndroidKeystoreKeyProvider.SIGNER_NAME,
         )
     }
 

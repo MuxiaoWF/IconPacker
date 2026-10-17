@@ -28,6 +28,11 @@ import javax.security.auth.x500.X500Principal
 class AndroidKeystoreKeyProvider(
     private val alias: String = DEFAULT_ALIAS,
     private val subject: String = DEFAULT_SUBJECT,
+    /**
+     * v1 签名者名（META-INF 下 .SF/.RSA 文件名）。可按项目覆盖——例如用户希望
+     * 与自己其他产物的签名条目名对齐；默认仍是历史值 [SIGNER_NAME]。
+     */
+    private val signerName: String = SIGNER_NAME,
 ) : SigningKeyProvider {
 
     /**
@@ -108,14 +113,15 @@ class AndroidKeystoreKeyProvider(
     private fun KeyStore.PrivateKeyEntry.toIdentity(): SigningIdentity {
         val chain = certificateChain?.filterIsInstance<X509Certificate>() ?: emptyList()
         require(chain.isNotEmpty()) { "证书链为空（alias=$alias）" }
-        return SigningIdentity(name = SIGNER_NAME, privateKey = privateKey, certificates = chain)
+        return SigningIdentity(name = signerName, privateKey = privateKey, certificates = chain)
     }
 
     companion object {
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
         private const val KEY_ALGORITHM = "RSA"
         private const val KEY_SIZE_BITS = 2048
-        private const val SIGNER_NAME = "ICONPACKER"
+        /** v1 签名者名默认值（META-INF 下 .SF/.RSA 文件名）；可按项目覆盖 */
+        const val SIGNER_NAME = "ICONPACKER"
         const val DEFAULT_ALIAS = "iconpacker_signing_key_v1"
         const val DEFAULT_SUBJECT = "IconPacker Device Signer"
 

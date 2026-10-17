@@ -16,7 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  */
 @Database(
     entities = [PackEntity::class, MappingEntity::class, IconAssetEntity::class],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class IconPackerDatabase : RoomDatabase() {
@@ -72,9 +72,35 @@ abstract class IconPackerDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v6 → v7：packs 增加签名配置族（签名密钥可自定义 + 签名者名 + 签名方案开关）。
+         *
+         * 全部默认值都让存量项目**行为完全不变**：
+         * - `signMode=0`（设备密钥）、三个方案开关 `1`（三方案同签）与既有打包
+         *  行为逐字一致；
+         * - 密钥库/别名/密码/签名者名五列可空，存量行均为 NULL——取默认值语义。
+         *
+         * 可空列不加 DEFAULT、实体上也不写 `@ColumnInfo(defaultValue)`；
+         * 非 NULL 列的 DEFAULT 必须与 `@ColumnInfo(defaultValue)` 逐字一致，
+         * 否则 Room 打开库时会判定"迁移未正确执行"并抛异常。
+         */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE packs ADD COLUMN signMode INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE packs ADD COLUMN keystorePath TEXT")
+                db.execSQL("ALTER TABLE packs ADD COLUMN keystorePassword TEXT")
+                db.execSQL("ALTER TABLE packs ADD COLUMN keystoreAlias TEXT")
+                db.execSQL("ALTER TABLE packs ADD COLUMN keyPassword TEXT")
+                db.execSQL("ALTER TABLE packs ADD COLUMN signerName TEXT")
+                db.execSQL("ALTER TABLE packs ADD COLUMN signSchemeV1 INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE packs ADD COLUMN signSchemeV2 INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE packs ADD COLUMN signSchemeV3 INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         fun build(context: Context): IconPackerDatabase =
             Room.databaseBuilder(context, IconPackerDatabase::class.java, "iconpacker.db")
-                .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .fallbackToDestructiveMigration(false)
                 .build()
     }

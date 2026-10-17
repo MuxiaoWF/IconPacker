@@ -10,6 +10,7 @@ import com.muxiao.iconpacker.ServiceLocator
 import com.muxiao.iconpacker.data.InstalledPackChecker
 import com.muxiao.iconpacker.data.PackEntity
 import com.muxiao.iconpacker.data.PackRepository
+import com.muxiao.iconpacker.data.PackSignConfig
 import com.muxiao.iconpacker.domain.PackVersionRules
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -111,18 +112,75 @@ class PackListViewModel(
     }
 
     /**
-     * 新建图标包；可选附带启动器图标（新建对话框选图，Uri 尚未落库）。
-     * 项目创建时即分配唯一包名，因此新建的图标包不会和已有项目抢同一个系统位置。
+     * 新建图标包（完整表单版，FR-02）。
+     *
+     * 校验交给仓库层统一处理（包名/版本/签名配置与编辑对话框共用同一套规则），
+     * 失败原因原样进消息队列；图标随后单独设置——创建失败不产生半成品，
+     * 图标失败才有"已创建但图标未设置"的降级提示。
      */
-    fun createPack(name: String, iconUri: Uri? = null) {
+    fun createPack(draft: PackDraft) {
         viewModelScope.launch {
-            val id = repository.createPack(name.trim())
-            if (iconUri != null) {
-                runCatching { repository.setPackIcon(id, iconUri) }
-                    .onFailure { messageFlow.value = "已创建图标包，但图标设置失败：${it.message}" }
+            try {
+                // 版本号输入在界面已校验过一次；这里再折算一次，防的是"界面漏校验直接落库"
+                val nextCode = when (val parsed = PackVersionRules.parseCode(draft.versionCodeInput)) {
+                    PackVersionRules.Parsed.Auto -> null
+                    is PackVersionRules.Parsed.Explicit -> parsed.code
+                    PackVersionRules.Parsed.Invalid -> {
+                        messageFlow.value = "版本号必须是大于 0 的整数"
+                        return@launch
+                    }
+                }
+                val id = repository.createPack(
+                    name = draft.name,
+                    packageName = draft.packageName,
+                    versionName = draft.versionName,
+                    nextVersionCode = nextCode,
+                    showInDrawer = draft.showInDrawer,
+                    sign = draft.sign,
+                )
+                if (draft.iconUri != null) {
+                    runCatching { repository.setPackIcon(id, draft.iconUri) }
+                        .onFailure { messageFlow.value = "已创建图标包，但图标设置失败：${it.message}" }
+                }
+                // 创建成功即直达映射工作台：新项目已自动持久化，用户可直接开始导入图标
+                createdPackIdFlow.value = id
+            } catch (e: Exception) {
+                messageFlow.value = "创建失败：${e.message}"
             }
-            // 创建成功即直达编辑页：新项目已自动持久化，用户可直接开始导入图标
-            createdPackIdFlow.value = id
+        }
+    }
+
+    /**
+     * 导入密钥库文件（新建/编辑对话框选文件时调用）。
+     *
+     * SAF Uri 只在本次授权内可读，必须当场落盘并把私有目录路径回传给表单；
+     * 结果回调 [onResult] 把成功路径或失败原因交给对话框呈现。
+     */
+    fun importKeystoreFile(uri: Uri, onResult: (Result<String>) -> Unit) {
+        viewModelScope.launch {
+            onResult(runCatching { repository.importKeystoreFile(uri) })
+        }
+    }
+
+    /** 设置项目签名配置（v7：密钥来源/签名者名/签名方案） */
+    fun setSigningConfig(pack: PackEntity, config: PackSignConfig) {
+        viewModelScope.launch {
+            val result = runCatching { repository.setSigningConfig(pack.id, config) }
+            messageFlow.value = result.fold(
+                onSuccess = { "签名配置已更新" },
+                onFailure = { "签名配置不可用：${it.message}" },
+            )
+        }
+    }
+
+    /** 复制项目（FR-02）：配置、图标池全量继承，包名/打包状态重置 */
+    fun duplicatePack(pack: PackEntity) {
+        viewModelScope.launch {
+            val result = runCatching { repository.duplicatePack(pack.id) }
+            messageFlow.value = result.fold(
+                onSuccess = { "已复制为「${pack.name}（副本）」" },
+                onFailure = { "复制失败：${it.message}" },
+            )
         }
     }
 
@@ -217,6 +275,11 @@ class PackListViewModel(
                 onFailure = { "导出失败：${it.message}" },
             )
         }
+    }
+
+    /** 密钥库导入等后台转前台操作在场外失败时，把原因投递到界面 Snackbar */
+    fun postMessage(text: String) {
+        messageFlow.value = text
     }
 
     fun consumeMessage() {

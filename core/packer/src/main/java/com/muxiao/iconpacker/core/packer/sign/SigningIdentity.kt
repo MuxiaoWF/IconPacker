@@ -26,9 +26,11 @@ data class SigningIdentity(
  *
  * 设计约束（见 docs/android-verification.md）：**不使用任何内置/硬编码密钥**——内置密钥可被提取，
  * 导致他人可伪造"本应用生成"的图标包（签名即更新身份，同签名不同包的覆盖安装
- * 是真实攻击面）。密钥必须在用户设备端生成并仅存于本应用私有空间。
+ * 是真实攻击面）。密钥必须在用户设备端生成，或由用户导入自己的密钥库文件。
  *
- * 唯一实现为 [AndroidKeystoreKeyProvider]（系统 Keystore，私钥不可导出）。
+ * 现有两类实现：
+ * - [AndroidKeystoreKeyProvider]（系统 Keystore，私钥不可导出，默认）；
+ * - [ImportedKeystoreProvider]（用户导入的密钥库文件，跨设备同身份）。
  */
 interface SigningKeyProvider {
     /** 获取签名身份；不存在则创建。重复调用返回同一身份。 */
