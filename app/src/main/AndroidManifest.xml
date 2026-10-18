@@ -32,6 +32,9 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"
         tools:ignore="RequestInstallPackagesPolicy" />
 
+    <!-- 检查更新（FR-09）：全应用唯一网络权限，仅用户在设置页手动点击时使用 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:name=".IconPackerApplication"
         android:allowBackup="true"

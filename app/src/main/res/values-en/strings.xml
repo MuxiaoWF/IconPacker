@@ -39,6 +39,16 @@
     <string name="import_quality_high">High quality</string>
     <string name="import_quality_balanced">Balanced</string>
     <string name="import_quality_compact">Compact</string>
+    <string name="settings_section_update">Check for updates</string>
+    <string name="settings_update_current">Current version %1$s</string>
+    <string name="settings_update_desc">Manually check GitHub Releases for a new version: one request only when you tap, no polling, no device information sent.</string>
+    <string name="settings_update_check">Check</string>
+    <string name="settings_update_checking">Checking…</string>
+    <string name="settings_update_latest">Up to date</string>
+    <string name="settings_update_available">New version available: %1$s</string>
+    <string name="settings_update_view">Open release page</string>
+    <string name="settings_update_failed">Check failed: %1$s</string>
+    <string name="settings_update_open_failed">Couldn\'t open the release page</string>
     <string name="settings_default_signer_name">Default signer name</string>
     <string name="settings_default_signer_name_hint">File name used by the v1 signing entry; leave blank for the built-in default</string>
     <string name="settings_default_schemes">Default signing schemes</string>

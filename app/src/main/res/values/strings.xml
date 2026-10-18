@@ -39,6 +39,16 @@
     <string name="import_quality_high">高画质</string>
     <string name="import_quality_balanced">均衡</string>
     <string name="import_quality_compact">体积优先</string>
+    <string name="settings_section_update">检查更新</string>
+    <string name="settings_update_current">当前版本 %1$s</string>
+    <string name="settings_update_desc">手动检查 GitHub Releases 上的新版本：仅在点击时发起一次请求，不自动轮询、不携带任何设备信息。</string>
+    <string name="settings_update_check">检查更新</string>
+    <string name="settings_update_checking">检查中…</string>
+    <string name="settings_update_latest">已是最新版本</string>
+    <string name="settings_update_available">发现新版本：%1$s</string>
+    <string name="settings_update_view">查看发布页</string>
+    <string name="settings_update_failed">检查失败：%1$s</string>
+    <string name="settings_update_open_failed">无法打开发布页</string>
     <string name="settings_default_signer_name">默认签名者名</string>
     <string name="settings_default_signer_name_hint">v1 签名条目使用的文件名；留空则用内置默认</string>
     <string name="settings_default_schemes">默认签名方案</string>

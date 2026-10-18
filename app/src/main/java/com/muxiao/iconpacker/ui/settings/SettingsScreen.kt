@@ -1,6 +1,7 @@
 package com.muxiao.iconpacker.ui.settings
 
 import android.app.Activity
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHostState
@@ -33,6 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.ServiceLocator
@@ -44,8 +48,10 @@ import com.muxiao.iconpacker.data.ThemeMode
 import com.muxiao.iconpacker.ui.components.AppChip
 import com.muxiao.iconpacker.ui.components.AppScaffold
 import com.muxiao.iconpacker.ui.components.SectionCard
+import com.muxiao.iconpacker.ui.theme.IconSize
 import com.muxiao.iconpacker.ui.theme.Layout
 import com.muxiao.iconpacker.ui.theme.Spacing
+import com.muxiao.iconpacker.update.UpdateChecker
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -78,6 +84,23 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var importing by remember { mutableStateOf(false) }
+
+    // 检查更新：手动触发，全应用唯一的网络行为（隐私口径见 UpdateChecker）。
+    // 不自动轮询——离线应用的承诺不能被"贴心"悄悄打破。
+    var updateChecking by remember { mutableStateOf(false) }
+    var updateResult by remember { mutableStateOf<UpdateChecker.UpdateResult?>(null) }
+    val currentVersion = remember {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrNull().orEmpty().ifBlank { "—" }
+    }
+    fun checkUpdate() {
+        updateChecking = true
+        scope.launch {
+            updateResult = UpdateChecker.check(currentVersion)
+            updateChecking = false
+        }
+    }
 
     // 密钥库文件导入：与项目编辑走同一条通道（复制进私有目录，SAF Uri 不落库）
     val keystorePicker = rememberLauncherForActivityResult(
@@ -419,6 +442,93 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+
+            SectionCard(title = stringResource(R.string.settings_section_update)) {
+                Text(
+                    text = stringResource(R.string.settings_update_current, currentVersion),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Spacer(modifier = Modifier.size(Spacing.sm))
+                Text(
+                    text = stringResource(R.string.settings_update_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.size(Spacing.md))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    Button(
+                        onClick = ::checkUpdate,
+                        enabled = !updateChecking,
+                        modifier = Modifier.heightIn(min = Layout.touchTarget),
+                    ) {
+                        Text(
+                            if (updateChecking) {
+                                stringResource(R.string.settings_update_checking)
+                            } else {
+                                stringResource(R.string.settings_update_check)
+                            },
+                        )
+                    }
+                    if (updateChecking) {
+                        CircularProgressIndicator(modifier = Modifier.size(IconSize.progressSmall))
+                    }
+                }
+                updateResult?.let { result ->
+                    Spacer(modifier = Modifier.size(Spacing.md))
+                    when (result) {
+                        is UpdateChecker.UpdateResult.UpToDate -> Text(
+                            text = stringResource(R.string.settings_update_latest),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+
+                        is UpdateChecker.UpdateResult.Available -> Column(
+                            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        ) {
+                            Text(
+                                text = stringResource(
+                                    R.string.settings_update_available,
+                                    result.release.tagName,
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            if (result.release.notes.isNotBlank()) {
+                                Text(
+                                    text = result.release.notes,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 4,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            TextButton(onClick = {
+                                runCatching {
+                                    context.startActivity(
+                                        Intent(Intent.ACTION_VIEW, result.release.htmlUrl.toUri()),
+                                    )
+                                }.onFailure {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            resources.getString(R.string.settings_update_open_failed),
+                                        )
+                                    }
+                                }
+                            }) {
+                                Text(stringResource(R.string.settings_update_view))
+                            }
+                        }
+
+                        is UpdateChecker.UpdateResult.Failed -> Text(
+                            text = stringResource(R.string.settings_update_failed, result.reason),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
             }
 
             Text(
