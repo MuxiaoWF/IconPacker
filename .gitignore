@@ -27,6 +27,9 @@ app/release/
 
 # ===== 内嵌模板 APK（由 template 模块构建生成，非源码）=====
 app/src/main/assets/template.apk
+# 测试 fixture：由 :core:packer:syncTemplateFixture 从 :template 产物同步，
+# 每次构建字节都可能变化（zip 时间戳），入库只会制造噪声 diff。
+core/packer/src/test/resources/template.apk
 
 # ===== 文档 =====
 docs/
