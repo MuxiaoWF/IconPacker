@@ -7,11 +7,15 @@ import com.muxiao.iconpacker.R
  * 启动器兼容性知识库（纯 Kotlin，无 Android 依赖，可 JVM 单测）。
  *
  * 背景：早期实现仅用 `queryIntentActivities(org.adw.ActivityStarter.THEMES)` 探测——
- * 该动作只有 ADW 系启动器注册，ColorOS / One UI / MIUI 等 OEM 启动器不注册它
- * （它们走自有主题引擎），于是被误判为"不支持"。但 曾据"ColorOS 11+ 更新日志
- * 写明支持三方图标包"把 ColorOS 标为 SUPPORTED——** 实测（PJU110 /
- * ColorOS 14.0.63 CN）推翻**：其图标功能走 ART+/主题商店体系，不支持第三方图标包
- * APK（证据链见 `com.coloros.launcher` 条目注释），已降回 LIMITED。
+ * 该动作只有 ADW 系启动器注册，ColorOS / One UI / MIUI 等 OEM 启动器一般不注册，
+ * 于是被误判为"不支持"。
+ *
+ * 标定原则：**不做"支持/不支持"的事实判定**。目前没有可采信的、覆盖各厂商桌面的
+ * 图标包兼容性证据，所有 OEM 系统桌面一律标为 [SupportLevel.LIMITED]，语义是
+ * **"需实测"**：引导用户先在桌面设置里尝试应用，确认没有入口后再更换第三方启动器。
+ *
+ * 待办：若日后要给出更强的结论（SUPPORTED / 不可用），必须在真机上按机型 + 系统版本
+ * 逐个复现并留下可复核记录，禁止凭逆向、更新日志或第三方文章的推断直接改档。
  *
  * 做法：以"包名 → 兼容性画像"为主，覆盖已知第三方图标包启动器与 OEM 启动器；
  * 未知启动器交给 [LauncherCompat] 的意图探测兜底（见 [LauncherCompat.themeQueryIntent]）。
@@ -23,7 +27,7 @@ object LauncherSupport {
         /** 标准第三方图标包协议，可直接应用 */
         SUPPORTED,
 
-        /** 自带主题引擎，可能支持也可能不支持标准图标包，需用户在启动器设置中尝试 */
+        /** 未经确认的启动器（厂商桌面等）：能否应用标准图标包暂无定论，需在桌面设置中实测 */
         LIMITED,
 
         /** 未知：无包名画像，也无意图命中 */
@@ -72,12 +76,7 @@ object LauncherSupport {
         "de.mm20.launcher" to LauncherProfile("Kvaesitso", SupportLevel.SUPPORTED),
         "projekt.launcher" to LauncherProfile("Hyperion Launcher", SupportLevel.SUPPORTED),
 
-        // ---- OEM 启动器 ----
-        // ColorOS 14（CN，PJU110 / 14.0.63）实测（逆向 OplusLauncher.apk +
-        // 运行时日志）：其「壁纸与个性化 → 图标」只有 ART+ 图标（主题商店的设计师重绘）
-        // 与内置风格，**没有应用第三方图标包 APK 的入口**；桌面 UxIconPackLoader 虽保留
-        // appfilter 加载代码（res/xml → assets 兜底），但启动链路从不触发，
-        // Settings.System.icon_pack_name 亦不被消费。故降为 LIMITED 并明示结论。
+        // ---- OEM 启动器（统一"需实测"，不做"支持/不支持"的事实判定）----
         "com.coloros.launcher" to LauncherProfile(
             "ColorOS 启动器",
             SupportLevel.LIMITED,
@@ -90,15 +89,14 @@ object LauncherSupport {
             nameRes = R.string.launcher_name_oppo,
             guidanceRes = R.string.launcher_guide_oppo,
         ),
-        // realme UI 默认不支持直接应用标准图标包（GeekChamp 实测）
+        // realme UI 与 ColorOS 同源，能否应用标准第三方图标包按需实测
         "com.realme.launcher" to LauncherProfile(
             "realme 启动器",
             SupportLevel.LIMITED,
             nameRes = R.string.launcher_name_realme,
             guidanceRes = R.string.launcher_guide_realme,
         ),
-        // 通用 AOSP 包名（部分 ROM 以该包名提供系统桌面）。注意：**本机 OPPO PJU110 的
-        // ColorOS 桌面正是 com.android.launcher**——LIMITED 文案必须与 ColorOS 实测一致。
+        // 通用 AOSP 包名（部分 ROM 以该包名提供系统桌面）
         "com.android.launcher" to LauncherProfile(
             "系统启动器",
             SupportLevel.LIMITED,

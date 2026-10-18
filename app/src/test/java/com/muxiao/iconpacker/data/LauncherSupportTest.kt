@@ -8,14 +8,14 @@ import org.junit.Test
 
 /**
  * [LauncherSupport] 纯逻辑单测（JVM，无 Android 依赖）。
- * 重点覆盖 ColorOS 误判修复、第三方启动器、OEM 启动器与未知包降级。
+ * 重点覆盖 OEM 桌面「需实测」判定、第三方启动器、未知包降级。
  */
 class LauncherSupportTest {
 
     @Test
     fun `ColorOS launcher is limited with guidance`() {
-        // ColorOS 14（CN）实测不支持第三方图标包 APK（ART+/主题商店体系），
-        // 曾据更新日志标 SUPPORTED，已降级——防止凭印象改回去。
+        // 该类桌面是否接受第三方图标包**没有可靠证据**一律 LIMITED（需实测）并给引导；不要凭逆向、更新日志
+        // 或第三方文章改判为 SUPPORTED，也不要断言"不支持"。
         val profile = LauncherSupport.classify("com.coloros.launcher")
         assertEquals(LauncherSupport.SupportLevel.LIMITED, profile?.supportLevel)
         assertTrue(profile?.guidanceRes != null)

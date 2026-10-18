@@ -60,7 +60,7 @@
     <!-- ===== 首次启动引导 ===== -->
     <string name="onboarding_intro">IconPacker 让你上传自有图标，一键打包成可安装的图标包 APK。</string>
     <string name="onboarding_prereq_title">使用前提：兼容的启动器</string>
-    <string name="onboarding_prereq_body">多数 OEM 系统启动器（Pixel Launcher、One UI Home、MIUI 等）使用自有主题机制，不直接应用标准第三方图标包；最稳妥的方式是安装一个支持图标包的启动器（如 Nova、Lawnchair、Apex），并在其图标样式设置里启用本应用生成的图标包。</string>
+    <string name="onboarding_prereq_body">多数 OEM 系统启动器（Pixel Launcher、One UI Home、MIUI、ColorOS 等）使用自有主题机制，它们能否直接应用标准第三方图标包暂无确切结论，需实测：建议先在桌面设置的图标选项里尝试应用已安装的图标包；若没有该入口，再安装一个支持图标包的启动器（如 Nova、Lawnchair、Apex），并在其图标样式设置里启用本应用生成的图标包。</string>
     <string name="onboarding_status_supported">当前启动器「%1$s」支持图标包</string>
     <string name="onboarding_status_limited">当前启动器「%1$s」可能支持图标包（需在启动器设置中应用）</string>
     <string name="onboarding_status_none">未检测到默认启动器</string>
@@ -84,16 +84,16 @@
     <string name="launcher_name_huawei">华为启动器</string>
     <string name="launcher_name_vivo">vivo 启动器</string>
     <string name="launcher_name_meizu">魅族启动器</string>
-    <string name="launcher_guide_coloros">ColorOS 的「图标」功能走 ART+/主题商店体系，暂不支持直接应用第三方图标包 APK（ColorOS 14 实测）。建议安装 Nova Launcher 或 Lawnchair 后启用本图标包。</string>
-    <string name="launcher_guide_oppo">OPPO 桌面与 ColorOS 同源，暂不支持直接应用第三方图标包 APK。建议安装 Nova Launcher 或 Lawnchair。</string>
-    <string name="launcher_guide_realme">realme UI 默认不支持直接应用标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair 以获得完整图标包支持。</string>
-    <string name="launcher_guide_android">该启动器可能使用自有主题机制（OPPO ColorOS 14 实测不支持第三方图标包 APK）。建议安装 Nova Launcher 或 Lawnchair 以获得最佳兼容性。</string>
-    <string name="launcher_guide_oneui">One UI 使用 Galaxy Themes 主题机制，不直接应用标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair。</string>
-    <string name="launcher_guide_pixel">Pixel Launcher 不支持标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair。</string>
-    <string name="launcher_guide_miui">小米启动器使用自有主题商店，不直接应用标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair。</string>
-    <string name="launcher_guide_huawei">华为启动器使用自有主题机制，不直接应用标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair。</string>
-    <string name="launcher_guide_vivo">vivo 启动器使用主题应用，不直接应用标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair。</string>
-    <string name="launcher_guide_meizu">魅族启动器使用自有主题机制，不直接应用标准第三方图标包。建议安装 Nova Launcher 或 Lawnchair。</string>
+    <string name="launcher_guide_coloros">ColorOS 桌面能否直接应用标准第三方图标包暂无确切结论，需实测。请先在「桌面设置 → 图标」中尝试应用本图标包；若没有该入口，再安装 Nova Launcher 或 Lawnchair。</string>
+    <string name="launcher_guide_oppo">OPPO 桌面（与 ColorOS 同源）能否直接应用标准第三方图标包暂无确切结论，需实测。请先在桌面设置的图标选项中尝试应用本图标包；若没有该入口，再安装 Nova Launcher 或 Lawnchair。</string>
+    <string name="launcher_guide_realme">realme 桌面（UI 与 ColorOS 同源）能否直接应用标准第三方图标包暂无确切结论，需实测。请先在桌面设置的图标选项中尝试应用本图标包；若没有该入口，再安装 Nova Launcher 或 Lawnchair。</string>
+    <string name="launcher_guide_android">该启动器能否应用标准第三方图标包暂无确切结论，需实测。请在启动器设置的图标选项中尝试应用本图标包；若没有该入口，再安装 Nova Launcher 或 Lawnchair。</string>
+    <string name="launcher_guide_oneui">One UI 桌面能否直接应用标准第三方图标包暂无确切结论，需实测。请先在桌面设置的图标选项中尝试应用本图标包；若没有该入口，再安装 Nova Launcher 或 Lawnchair。</string>
+    <string name="launcher_guide_pixel">Pixel Launcher 能否应用标准第三方图标包暂无确切结论，需实测。请先在主屏幕设置的图标选项中尝试应用本图标包；若没有该入口，再安装 Nova Launcher 或 Lawnchair。</string>
+    <string name="launcher_guide_miui">MIUI / HyperOS 桌面能否直接应用标准第三方图标包暂无确切结论，需实测。请先在桌面设置的图标选项中尝试应用本图标包；若没有该入口，再安装 Nova Launcher 或 Lawnchair。</string>
+    <string name="launcher_guide_huawei">华为桌面能否直接应用标准第三方图标包暂无确切结论，需实测。请先在桌面设置的图标选项中尝试应用本图标包；若没有该入口，再安装 Nova Launcher 或 Lawnchair。</string>
+    <string name="launcher_guide_vivo">vivo 桌面能否直接应用标准第三方图标包暂无确切结论，需实测。请先在桌面设置的图标选项中尝试应用本图标包；若没有该入口，再安装 Nova Launcher 或 Lawnchair。</string>
+    <string name="launcher_guide_meizu">魅族桌面能否直接应用标准第三方图标包暂无确切结论，需实测。请先在桌面设置的图标选项中尝试应用本图标包；若没有该入口，再安装 Nova Launcher 或 Lawnchair。</string>
 
     <!-- ===== 项目列表（FR-02/FR-08） ===== -->
     <string name="packlist_title">我的图标包</string>

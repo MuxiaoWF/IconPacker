@@ -62,7 +62,7 @@ class RealTemplateTest {
      * （AssetManager2::GetResourceId）对请求包名与 **arsc 中记录的包名字符串**
      * 做逐字符精确匹配，不一致一律返回 0。只改 manifest 不改 arsc 的产物
      * 装得上、能被识别，但启动器按包名找 appfilter / 图标全部落空——
-     * 桌面表现为"图标包没有任何可以替换的图标"（真机 ColorOS 实测踩到）。
+     * 桌面表现为"图标包没有任何可以替换的图标"（ColorOS 等桌面踩到）。
      *
      * 同时锁住 resources.arsc 的 STORED 压缩方式：targetSdk ≥ 30 强制要求
      * 未压缩 + 4 字节对齐，替换时若被写成 DEFLATED 会直接装不上。
@@ -500,7 +500,7 @@ class RealTemplateTest {
             ?: error("产物缺少 res/xml/appfilter.xml")
         val chunks = walkChunks(appfilter)
 
-        // 必须包含空资源表 chunk（与 aapt2 对齐，ColorOS 严格逐 chunk 校验）
+        // 必须包含空资源表 chunk（与 aapt2 对齐，ColorOS 等严格解析器逐 chunk 校验）
         assertTrue(
             "appfilter.xml 缺少资源表 chunk",
             chunks.any { it.first == 0x0180 },

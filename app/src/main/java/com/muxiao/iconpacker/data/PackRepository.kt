@@ -534,7 +534,7 @@ class PackRepository(
      *
      * appfilter 的 component 是 `ComponentInfo{包名/活动类}`；部分图标包源数据写成
      * `ComponentInfo{包名/}`（斜杠后为空）。标准解析（ComponentName.unflattenFromString）
-     * 对空类名返回 null，Kvaesitso 源码即按此整条跳过；实测 ColorOS 14 同样把这种
+     * 对空类名返回 null，Kvaesitso 源码即按此整条跳过；ColorOS、MIUI 等桌面同样把这种
      * 条目视为无效，表现为"图标包没有任何可以替换的图标"。
      * 本机已安装的应用会被 [MappingReconciler] 校准成真实启动组件；仍未安装的只能
      * 原样保留——打包页必须把数量告诉用户，否则"映射几十条、桌面一条不生效"

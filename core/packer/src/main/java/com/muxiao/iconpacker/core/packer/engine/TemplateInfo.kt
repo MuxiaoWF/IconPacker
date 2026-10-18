@@ -12,7 +12,7 @@ package com.muxiao.iconpacker.core.packer.engine
  * ⚠️ 改写 manifest 的同时**必须**用 arsc/ArscPatcher 把 resources.arsc 里的包名
  * 字符串一并改写：getIdentifier 按 arsc 包名精确匹配（AssetManager2::GetResourceId），
  * 只改 manifest 的产物装得上、能被识别，但启动器按包名找 appfilter/图标一律落空
- * ——桌面表现为"图标包没有任何可以替换的图标"（真机 ColorOS 实测踩过）。
+ * ——桌面表现为"图标包没有任何可以替换的图标"（ColorOS 等桌面踩过）。
  *
  * ⚠️ 改名成本与影响：**只改这里 + template 模块的 applicationId/namespace 两处即可**，
  * 引擎与启动器都不看这个值（启动器只认 appfilter 里的组件名）。改名只会换掉

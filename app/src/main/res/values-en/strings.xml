@@ -60,7 +60,7 @@
     <!-- ===== First-run onboarding ===== -->
     <string name="onboarding_intro">IconPacker turns your own icons into an installable icon pack APK in one tap.</string>
     <string name="onboarding_prereq_title">Requirement: a compatible launcher</string>
-    <string name="onboarding_prereq_body">Most OEM system launchers (Pixel Launcher, One UI Home, MIUI, etc.) use their own theming and don\'t apply standard third-party icon packs. The reliable path is to install a launcher that supports icon packs (Nova, Lawnchair, Apex, …) and enable the pack this app builds in its icon style settings.</string>
+    <string name="onboarding_prereq_body">Most OEM system launchers (Pixel Launcher, One UI Home, MIUI, ColorOS, etc.) use their own theming, and there is no confirmed verdict yet on whether they can apply standard third-party icon packs directly — it needs to be tried. Try applying the installed pack in the launcher icon settings first; if there is no such entry, install a launcher that supports icon packs (Nova, Lawnchair, Apex, …) and enable the pack this app builds in its icon style settings.</string>
     <string name="onboarding_status_supported">Your current launcher "%1$s" supports icon packs</string>
     <string name="onboarding_status_limited">Your current launcher "%1$s" may support icon packs (apply it in the launcher\'s settings)</string>
     <string name="onboarding_status_none">No default launcher detected</string>
@@ -84,16 +84,16 @@
     <string name="launcher_name_huawei">Huawei launcher</string>
     <string name="launcher_name_vivo">vivo launcher</string>
     <string name="launcher_name_meizu">Meizu launcher</string>
-    <string name="launcher_guide_coloros">ColorOS\'s "Icons" feature goes through the ART+/theme store system and doesn\'t support third-party icon pack APKs (verified on ColorOS 14). Install Nova Launcher or Lawnchair, then enable this icon pack there.</string>
-    <string name="launcher_guide_oppo">OPPO\'s home is built on ColorOS and doesn\'t support third-party icon pack APKs yet. Install Nova Launcher or Lawnchair.</string>
-    <string name="launcher_guide_realme">realme UI doesn\'t support standard third-party icon packs by default. Install Nova Launcher or Lawnchair for full icon pack support.</string>
-    <string name="launcher_guide_android">This launcher likely uses a proprietary theming mechanism (OPPO ColorOS 14 was verified not to). Install Nova Launcher or Lawnchair for the best compatibility.</string>
-    <string name="launcher_guide_oneui">One UI uses Galaxy Themes and doesn\'t apply standard third-party icon packs. Install Nova Launcher or Lawnchair.</string>
-    <string name="launcher_guide_pixel">Pixel Launcher doesn\'t support standard third-party icon packs. Install Nova Launcher or Lawnchair.</string>
-    <string name="launcher_guide_miui">Xiaomi\'s launcher uses its own theme store and doesn\'t apply standard third-party icon packs. Install Nova Launcher or Lawnchair.</string>
-    <string name="launcher_guide_huawei">Huawei\'s launcher uses its own theming and doesn\'t apply standard third-party icon packs. Install Nova Launcher or Lawnchair.</string>
-    <string name="launcher_guide_vivo">vivo\'s launcher relies on a theme app and doesn\'t apply standard third-party icon packs. Install Nova Launcher or Lawnchair.</string>
-    <string name="launcher_guide_meizu">Meizu\'s launcher uses its own theming and doesn\'t apply standard third-party icon packs. Install Nova Launcher or Lawnchair.</string>
+    <string name="launcher_guide_coloros">There is no confirmed verdict yet on whether the ColorOS launcher can apply standard third-party icon packs directly, so it needs to be tried. Try selecting the installed pack in the home screen icon settings first; if there is no such entry, install Nova Launcher or Lawnchair.</string>
+    <string name="launcher_guide_oppo">There is no confirmed verdict yet on whether the OPPO launcher (same family as ColorOS) can apply standard third-party icon packs directly, so it needs to be tried. Try it in the home screen icon settings first; if there is no such entry, install Nova Launcher or Lawnchair.</string>
+    <string name="launcher_guide_realme">There is no confirmed verdict yet on whether the realme launcher (ColorOS-based UI) can apply standard third-party icon packs directly, so it needs to be tried. Try it in the home screen icon settings first; if there is no such entry, install Nova Launcher or Lawnchair.</string>
+    <string name="launcher_guide_android">There is no confirmed verdict yet on whether this launcher accepts standard third-party icon packs, so it needs to be tried. Try applying the installed pack in the launcher icon settings first; if there is no such entry, install Nova Launcher or Lawnchair.</string>
+    <string name="launcher_guide_oneui">There is no confirmed verdict yet on whether One UI home can apply standard third-party icon packs directly, so it needs to be tried. Try applying the installed pack in the home screen icon settings first; if there is no such entry, install Nova Launcher or Lawnchair.</string>
+    <string name="launcher_guide_pixel">There is no confirmed verdict yet on whether Pixel Launcher accepts standard third-party icon packs, so it needs to be tried. Try it in the home screen settings first; if there is no such entry, install Nova Launcher or Lawnchair.</string>
+    <string name="launcher_guide_miui">There is no confirmed verdict yet on whether the MIUI / HyperOS launcher can apply standard third-party icon packs directly, so it needs to be tried. Try applying the installed pack in the launcher icon settings first; if there is no such entry, install Nova Launcher or Lawnchair.</string>
+    <string name="launcher_guide_huawei">There is no confirmed verdict yet on whether the Huawei launcher can apply standard third-party icon packs directly, so it needs to be tried. Try applying the installed pack in the launcher icon settings first; if there is no such entry, install Nova Launcher or Lawnchair.</string>
+    <string name="launcher_guide_vivo">There is no confirmed verdict yet on whether the vivo launcher can apply standard third-party icon packs directly, so it needs to be tried. Try applying the installed pack in the launcher icon settings first; if there is no such entry, install Nova Launcher or Lawnchair.</string>
+    <string name="launcher_guide_meizu">There is no confirmed verdict yet on whether the Meizu launcher can apply standard third-party icon packs directly, so it needs to be tried. Try applying the installed pack in the launcher icon settings first; if there is no such entry, install Nova Launcher or Lawnchair.</string>
 
     <!-- ===== Project list (FR-02/FR-08) ===== -->
     <string name="packlist_title">My icon packs</string>

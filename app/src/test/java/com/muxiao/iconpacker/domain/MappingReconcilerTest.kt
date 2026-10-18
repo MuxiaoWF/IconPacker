@@ -50,7 +50,7 @@ class MappingReconcilerTest {
      * 残缺形式 `ComponentInfo{包名/}`（斜杠后无类名）必须被视为"需要校准"：
      * 部分图标包的 appfilter 以这种形式预置映射，而标准解析
      * （ComponentName.unflattenFromString）对空类名返回 null——Kvaesitso 源码
-     * 即按此整条跳过，实测 ColorOS 14 同样视为无效。原样打进产物的结果是
+     * 即按此整条跳过；ColorOS、MIUI 等桌面同样视为无效。原样打进产物的结果是
      * "图标包没有任何可以替换的图标"（本项目实测踩过：71 条映射 69 条残缺）。
      * 应用已装时必须 Rebind 成真实启动组件。
      */
