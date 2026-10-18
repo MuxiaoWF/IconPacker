@@ -277,7 +277,8 @@ public class MainActivity extends Activity {
         try {
             ApplicationInfo info = getPackageManager().getApplicationInfo(getPackageName(), 0);
             CharSequence label = info.loadLabel(getPackageManager());
-            if (label.length() > 0) return label.toString();
+            // TextUtils 而不是 isEmpty()：Android 的 CharSequence 没有 isEmpty()（那是 JDK 15 才加的）
+            if (!android.text.TextUtils.isEmpty(label)) return label.toString();
         } catch (PackageManager.NameNotFoundException ignored) {
             // 查询自己失败基本不可能，真失败了也不该因为标题而崩溃
         }

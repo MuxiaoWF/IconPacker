@@ -34,6 +34,18 @@ class AppSettings(context: Context) {
         val themeMode: ThemeMode = ThemeMode.FollowSystem,
         /** 应用内语言：跟随系统 / 中文 / 英文（LocaleMode 序列化串） */
         val localeMode: LocaleMode = LocaleMode.FollowSystem,
+        /**
+         * 新建项目是否默认使用导入的密钥库。
+         *
+         * 只预填"用哪种签名身份 + 哪个文件 + 哪个别名"，**不预填密码**：
+         * 密码是一次性凭据，落进 SharedPreferences 等于给所有未来项目配一把通用钥匙，
+         * 而 SharedPreferences 是明文 XML。密码在新建/编辑表单里输入。
+         */
+        val importedKeystore: Boolean = false,
+        /** 默认密钥库文件在私有目录的全路径（空 = 未选择） */
+        val keystorePath: String = "",
+        /** 默认密钥别名 */
+        val keystoreAlias: String = "",
     )
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -41,8 +53,17 @@ class AppSettings(context: Context) {
     private val _state = MutableStateFlow(read())
     val state: StateFlow<State> = _state.asStateFlow()
 
+    /**
+     * 必须持有强引用：SharedPreferences 对监听器只持弱引用，
+     * 直接传 lambda 会在 GC 后静默失效（表现为"设置写进磁盘了，界面不刷新"）。
+     */
+    private val prefsListener =
+        android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+            _state.value = read()
+        }
+
     init {
-        prefs.registerOnSharedPreferenceChangeListener { _, _ -> _state.value = read() }
+        prefs.registerOnSharedPreferenceChangeListener(prefsListener)
     }
 
     fun setVersionName(value: String) = edit { it.putString(KEY_VERSION_NAME, value.trim()) }
@@ -61,6 +82,19 @@ class AppSettings(context: Context) {
 
     fun setLocaleMode(value: LocaleMode) = edit { it.putString(KEY_LOCALE_MODE, value.name) }
 
+    fun setImportedKeystore(value: Boolean) = edit { it.putBoolean(KEY_IMPORTED_KEYSTORE, value) }
+
+    fun setKeystorePath(value: String) = edit { it.putString(KEY_KEYSTORE_PATH, value) }
+
+    fun setKeystoreAlias(value: String) = edit { it.putString(KEY_KEYSTORE_ALIAS, value.trim()) }
+
+    /** 清除默认签名身份：回到设备端生成密钥 */
+    fun clearKeystore() = edit {
+        it.putBoolean(KEY_IMPORTED_KEYSTORE, false)
+        it.putString(KEY_KEYSTORE_PATH, "")
+        it.putString(KEY_KEYSTORE_ALIAS, "")
+    }
+
     private inline fun edit(block: (android.content.SharedPreferences.Editor) -> Unit) {
         prefs.edit().also(block).apply()
     }
@@ -75,6 +109,9 @@ class AppSettings(context: Context) {
             .orEmpty().ifBlank { DEFAULT_ARTIFACT_TEMPLATE },
         themeMode = ThemeMode.from(prefs.getString(KEY_THEME_MODE, null)),
         localeMode = LocaleMode.from(prefs.getString(KEY_LOCALE_MODE, null)),
+        importedKeystore = prefs.getBoolean(KEY_IMPORTED_KEYSTORE, false),
+        keystorePath = prefs.getString(KEY_KEYSTORE_PATH, "").orEmpty(),
+        keystoreAlias = prefs.getString(KEY_KEYSTORE_ALIAS, "").orEmpty(),
     )
 
     companion object {
@@ -101,5 +138,8 @@ class AppSettings(context: Context) {
         private const val KEY_ARTIFACT_TEMPLATE = "artifact_template"
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_LOCALE_MODE = "locale_mode"
+        private const val KEY_IMPORTED_KEYSTORE = "default_imported_keystore"
+        private const val KEY_KEYSTORE_PATH = "default_keystore_path"
+        private const val KEY_KEYSTORE_ALIAS = "default_keystore_alias"
     }
 }

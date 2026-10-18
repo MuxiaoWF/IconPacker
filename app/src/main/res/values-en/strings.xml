@@ -35,6 +35,20 @@
     <string name="settings_default_signer_name">Default signer name</string>
     <string name="settings_default_signer_name_hint">File name used by the v1 signing entry; leave blank for the built-in default</string>
     <string name="settings_default_schemes">Default signing schemes</string>
+    <string name="settings_section_signing">Signing identity</string>
+    <string name="settings_sign_mode_device">On-device key</string>
+    <string name="settings_sign_mode_imported">Imported keystore</string>
+    <string name="settings_sign_mode_device_desc">The key is generated in this device\'s AndroidKeyStore and cannot be exported. Each icon pack has its own identity, so installs cannot be upgraded after switching devices.</string>
+    <string name="settings_sign_mode_imported_desc">Sign with your own keystore: the same identity produces matching artifacts on multiple devices, so updates install cleanly.</string>
+    <string name="settings_keystore_file">Keystore file</string>
+    <string name="settings_keystore_not_chosen">Not selected</string>
+    <string name="settings_keystore_pick">Choose file</string>
+    <string name="settings_keystore_replace">Replace</string>
+    <string name="settings_keystore_alias">Default key alias</string>
+    <string name="settings_keystore_password_note">The password is not stored here: it is a reusable credential, so you enter it when creating or editing a pack.</string>
+    <string name="settings_keystore_clear">Clear default identity</string>
+    <string name="settings_keystore_imported">Imported %1$s</string>
+    <string name="settings_keystore_import_failed">Import failed: %1$s</string>
     <string name="settings_schemes_all_off">All schemes are off: when you save a new project you\'ll be asked to keep at least one, and the "Create" button will be disabled</string>
     <string name="settings_section_artifact_template">Export artifact file name template</string>
     <string name="settings_artifact_template">File name template</string>
@@ -44,7 +58,6 @@
     <string name="settings_footer_note">Note: these only pre-fill the "new project" form; existing projects keep their own settings.</string>
 
     <!-- ===== First-run onboarding ===== -->
-    <string name="onboarding_title">Welcome to IconPacker</string>
     <string name="onboarding_intro">IconPacker turns your own icons into an installable icon pack APK in one tap.</string>
     <string name="onboarding_prereq_title">Requirement: a compatible launcher</string>
     <string name="onboarding_prereq_body">Most OEM system launchers (Pixel Launcher, One UI Home, MIUI, etc.) use their own theming and don\'t apply standard third-party icon packs. The reliable path is to install a launcher that supports icon packs (Nova, Lawnchair, Apex, …) and enable the pack this app builds in its icon style settings.</string>
@@ -87,16 +100,12 @@
     <string name="packlist_import">Import</string>
     <string name="packlist_importing">Importing</string>
     <string name="cd_settings">Settings</string>
-    <string name="cd_create_pack">Create icon pack</string>
-    <string name="packlist_empty">No icon packs yet.\nTap the button at the bottom right to create your first one, then import icons, map them to apps, and build in one tap.</string>
     <string name="packlist_backup_filename">%1$s-backup.zip</string>
     <string name="packlist_delete_title">Delete icon pack</string>
     <string name="packlist_delete_confirm">"%1$s" and all of its mappings, icons and build artifacts will be deleted. This can\'t be undone.</string>
-    <string name="packlist_version_status">Version %1$s (v%2$d) · %3$s</string>
     <string name="pack_status_never_packed">Never built</string>
     <string name="pack_status_dirty">Unsaved changes</string>
     <string name="pack_status_packed">Built</string>
-    <string name="packlist_next_version">Next build v%1$d (set manually)</string>
     <string name="packlist_install_not_installed">Not installed</string>
     <string name="packlist_install_latest">Up to date</string>
     <string name="packlist_install_update">Update available (installed v%1$d → v%2$d)</string>
@@ -121,6 +130,7 @@
     <!-- ===== Messages (project list VM) ===== -->
     <string name="msg_version_code_invalid">Version code must be an integer greater than 0</string>
     <string name="msg_keystore_read_failed">Couldn\'t read the keystore file: %1$s</string>
+    <string name="msg_icon_read_failed">Couldn\'t read the selected image. Try another one.</string>
     <string name="msg_pack_created_icon_failed">The icon pack was created, but setting its icon failed: %1$s</string>
     <string name="msg_create_failed">Creation failed: %1$s</string>
     <string name="msg_sign_config_updated">Signing configuration updated</string>
@@ -156,7 +166,6 @@
     <string name="form_version_code_preview">Next build will use v%1$d; clear to return to auto-increment</string>
     <string name="form_package_name_label">Package name (optional, auto-generated if blank)</string>
     <string name="form_package_name_hint">Each icon pack needs a unique package name to coexist on the system; after changing it you must rebuild and install — the old package name stays on the device as a separate app (you can uninstall it yourself)</string>
-    <string name="form_sdk_section">Artifact SDK (optional, template defaults if blank)</string>
     <string name="form_sdk_min_hint">Blank uses the template (%1$d); raising it blocks old devices that can\'t install</string>
     <string name="form_sdk_target_hint">Blank uses the template; usually raised without touching minSdk</string>
     <string name="err_min_sdk_range">minSdk must be between %1$d and %2$d</string>
@@ -165,15 +174,20 @@
     <string name="form_show_in_drawer">Show in app drawer</string>
     <string name="form_show_in_drawer_on">The icon pack shows up in the drawer; tapping it opens an enable hint</string>
     <string name="form_show_in_drawer_off">Theme resource only; doesn\'t take a drawer slot</string>
-    <string name="form_icon_section">Icon (shown in the launcher)</string>
-    <string name="form_icon_section_optional">Icon (shown in the launcher), optional</string>
+    <string name="form_section_basic">Basics</string>
+    <string name="form_section_icon">Launcher icon</string>
+    <string name="form_section_build">Build &amp; display</string>
+    <string name="form_section_optional">Optional</string>
     <string name="form_pick_image">Pick image</string>
+    <string name="form_change_image">Change image</string>
+    <string name="form_remove_icon">Remove icon</string>
+    <string name="form_icon_set_subtitle">Using an edited icon; changing or removing it leaves mapped icons untouched</string>
+    <string name="form_icon_unset_subtitle">Not set; pick an image to crop and shape it first (otherwise the template icon is kept)</string>
     <string name="common_clear">Clear</string>
     <string name="form_sign_section">Signing</string>
     <string name="form_import_keystore">Use an imported keystore</string>
     <string name="form_import_keystore_on">Sign with your own key, so packs built on any device share one identity and can overwrite each other</string>
     <string name="form_import_keystore_off">Default: the key is generated in this device\'s Keystore and can\'t be exported</string>
-    <string name="form_keystore_not_chosen">No keystore file chosen yet</string>
     <string name="form_pick_keystore">Choose keystore file</string>
     <string name="form_keystore_password">Keystore password</string>
     <string name="form_key_alias">Key alias</string>
@@ -221,13 +235,18 @@
     <string name="cd_auto_match">Auto-match all</string>
     <string name="mapping_import_album">Import photos</string>
     <string name="mapping_import_zip">Import ZIP</string>
-    <string name="mapping_progress">Mapped %1$d / %2$d · Icons %3$d</string>
     <string name="common_build">Build</string>
     <string name="mapping_tab_apps">Apps %1$d</string>
     <string name="mapping_tab_icons">Icons %1$d</string>
     <string name="mapping_search_apps">Search apps</string>
     <string name="mapping_add_target">Add mapping</string>
     <string name="mapping_only_unmapped">Unmapped only</string>
+    <string name="mapping_only_unused">Unused only</string>
+    <string name="mapping_subtitle_unmapped_apps">%1$d unmapped</string>
+    <string name="mapping_subtitle_unused_icons">%1$d unused</string>
+    <string name="mapping_apps_all_mapped_title">All apps are mapped</string>
+    <string name="mapping_icons_all_used_title">Every icon is in use</string>
+    <string name="mapping_icons_all_used_body">Turn off the filter in the top bar to see all icons</string>
     <string name="mapping_all_mapped_done">All installed apps are mapped; to assign icons to apps not installed yet, tap "Add mapping"</string>
     <string name="mapping_icon_count">%1$d icons</string>
     <string name="mapping_unify_shape">Unify shape</string>
@@ -245,6 +264,8 @@
     <string name="common_search">Search</string>
     <string name="mapping_no_match">No matching apps</string>
     <string name="mapping_pick_icon_title">Pick an icon (%1$d)</string>
+    <string name="mapping_pick_icon_current">Currently used icon</string>
+    <string name="mapping_clear_assignment">Clear mapping</string>
     <string name="mapping_icons_pool_empty">The icon pool is empty. Import icons with the buttons above first.</string>
     <string name="err_mapping_target_empty">Enter a package name, or tap "Pick from installed apps"</string>
     <string name="err_mapping_target_not_installed">%1$s isn\'t installed on this device, so the launch entry can\'t be determined. Install the app first, or complete the entry as a component (e.g. %1$s/.MainActivity).</string>
@@ -255,7 +276,7 @@
     <string name="mapping_targets_count">Used by %1$d apps</string>
     <string name="mapping_detail_no_targets">Not assigned to any app</string>
     <string name="mapping_detail_header">Used by %1$d apps:</string>
-    <string name="mapping_target_pending_install">%1$s · not installed; takes effect once installed</string>
+    <string name="mapping_target_pending_short">Not installed · takes effect once installed</string>
     <string name="cd_remove_target">Remove this mapping</string>
     <string name="mapping_add_target_by_name">Add mapping (by package name)</string>
     <string name="mapping_edit_icon">Edit icon</string>
@@ -277,6 +298,7 @@
     <string name="msg_retarget_displaced">Mapping now points to %1$s (its previous mapping was replaced)</string>
     <string name="msg_retarget">Mapping now points to %1$s</string>
     <string name="msg_reassign_icon">%1$s\'s mapping now points to this icon (its previous mapping was replaced)</string>
+    <string name="msg_unassign">Cleared the icon mapping for %1$s</string>
     <string name="msg_automatch_added">Auto-matching added %1$d mappings</string>
     <string name="msg_automatch_none">No auto-matchable apps found</string>
     <string name="msg_import_failed">Import failed: %1$s</string>
@@ -303,6 +325,7 @@
 
     <!-- ===== Icon editor (FR-05) ===== -->
     <string name="editor_title">Edit icon</string>
+    <string name="editor_title_pack_icon">Edit pack icon</string>
     <string name="editor_section_crop">Crop</string>
     <string name="editor_crop_hint">Drag to move the viewport, pinch to zoom; what\'s inside the frame becomes the final (square) icon.</string>
     <string name="editor_zoom_label">Zoom %1$s×</string>
@@ -310,12 +333,10 @@
     <string name="editor_source_loading">Loading source image…</string>
     <string name="editor_background_on">On: the color will be padded around the content</string>
     <string name="editor_background_off">No background by default, the icon itself only</string>
-    <string name="editor_border_title">Border</string>
     <string name="editor_border_on">On: outlined along the shape</string>
     <string name="editor_border_off">No border by default</string>
     <string name="editor_border_width">Width %1$d%% (of the icon side)</string>
     <string name="editor_border_color">Color</string>
-    <string name="editor_scale_label">Content scale %1$d%%</string>
     <string name="editor_scale_fill">" (fill)"</string>
     <string name="editor_scale_hint">With no background/border, scaling down leaves transparent padding around the content.</string>
     <string name="editor_overwrite_warn">This icon already has saved edits; saving again will overwrite them. "Restore" brings back the original.</string>
@@ -352,8 +373,6 @@
     <string name="common_back">Back</string>
     <string name="build_enable_hint">How to enable: Nova → Settings → Look &amp; feel → Icon style → Icon theme; Lawnchair → Home settings → General → Icon style; Apex → Settings → Theme → Icon pack.</string>
     <string name="build_success_title">Build complete</string>
-    <string name="build_size_signer">Size %1$s · Signer %2$s</string>
-    <string name="build_version_line">Version %1$s (v%2$d)</string>
     <string name="build_sdk_rewrite_note">" · SDK rewrite: %1$s"</string>
     <string name="common_install">Install</string>
     <string name="build_share">Share</string>
@@ -366,4 +385,29 @@
     <string name="msg_build_share_failed">Share failed: %1$s</string>
     <string name="msg_build_open_launcher_failed">Couldn\'t open the launcher</string>
     <string name="msg_build_no_launcher">No third-party launcher found</string>
+
+    <!-- ===== Layout refresh (2026-10): summaries, empty states, metric labels ===== -->
+    <string name="packlist_count">%1$d icon packs</string>
+    <string name="packlist_meta">%1$s (v%2$d) · %3$s</string>
+    <string name="packlist_next_version_short">Next v%1$d</string>
+    <string name="packlist_empty_title">No icon packs yet</string>
+    <string name="packlist_empty_body">Import icons, map them to apps, and build an installable icon pack APK in one tap.</string>
+    <string name="packlist_new">New</string>
+    <string name="mapping_metric_apps">Apps</string>
+    <string name="mapping_metric_mapped">Mapped</string>
+    <string name="mapping_metric_icons">Icons</string>
+    <string name="mapping_apps_empty">No matching apps</string>
+    <string name="mapping_icons_empty_title">No icons yet</string>
+    <string name="editor_preview_hint">Preview matches the built result</string>
+    <string name="editor_group_scale">Content scale</string>
+    <string name="editor_group_border">Border</string>
+    <string name="build_metric_size">Size</string>
+    <string name="build_metric_version">Version</string>
+    <string name="build_metric_signer">Signer</string>
+    <string name="build_status_ready">Ready to build</string>
+    <string name="build_status_ready_body">%1$d app mappings — start building when you\'re set</string>
+    <string name="build_status_running">Building</string>
+    <string name="build_status_done_body">Artifact created — install or share it now</string>
+    <string name="build_status_failed_body">Check the details below and try again</string>
+    <string name="onboarding_brand_subtitle">Icon pack builder</string>
 </resources>

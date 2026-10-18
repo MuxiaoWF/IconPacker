@@ -8,6 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.muxiao.iconpacker.ui.build.BuildScreen
 import com.muxiao.iconpacker.ui.editor.IconEditorScreen
+import com.muxiao.iconpacker.ui.editor.IconEditorTarget
 import com.muxiao.iconpacker.ui.mapping.MappingScreen
 import com.muxiao.iconpacker.ui.packlist.PackListScreen
 import com.muxiao.iconpacker.ui.settings.SettingsScreen
@@ -61,8 +62,7 @@ fun IconPackerApp() {
             val packId = backStackEntry.arguments?.getLong("packId") ?: 0L
             val slot = backStackEntry.arguments?.getInt("slot") ?: 0
             IconEditorScreen(
-                packId = packId,
-                slot = slot,
+                target = IconEditorTarget.Slot(packId, slot),
                 onBack = { navController.popBackStack() },
             )
         }

@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /** 图标编辑状态（FR-05） */
 data class IconEditorUiState(
@@ -45,11 +46,12 @@ data class IconEditorUiState(
  *
  * 编辑始终从**原图**出发（非破坏性，FR-05 验收 3）；
  * 预览与保存走同一条合成路径（IconProcessor），保证所见即所得。
+ *
+ * 处理对象由 [IconEditorTarget] 决定：图标库槽位走仓库，图标包图标只写文件。
  */
 class IconEditorViewModel(
     private val repository: PackRepository,
-    private val packId: Long,
-    private val slot: Int,
+    private val target: IconEditorTarget,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(IconEditorUiState())
@@ -64,26 +66,40 @@ class IconEditorViewModel(
      *
      * 拖动裁剪框时按帧重算，若每帧都从文件重解码 4K JPEG 必然掉帧；
      * 长边已由 [IconProcessor.decodeForEditing] 压到 1080，约 3MB，可以放心常驻。
- */
+     */
     private var sourceBitmap: Bitmap? = null
 
     init {
         viewModelScope.launch {
-            val icon = repository.getIcon(packId, slot)
-            if (icon == null) {
-                _uiState.update { it.copy(loading = false, message = UiText(R.string.editor_msg_missing)) }
-                return@launch
-            }
-            originalPath = icon.sourcePath
-            _uiState.update {
-                it.copy(
-                    loading = false,
-                    iconName = icon.originalName,
-                    hasEdit = icon.editedPath != null,
-                )
+            val sourcePath = when (target) {
+                is IconEditorTarget.Slot -> {
+                    val icon = repository.getIcon(target.packId, target.slot)
+                    if (icon == null) {
+                        _uiState.update {
+                            it.copy(loading = false, message = UiText(R.string.editor_msg_missing))
+                        }
+                        return@launch
+                    }
+                    originalPath = icon.sourcePath
+                    _uiState.update {
+                        it.copy(
+                            loading = false,
+                            iconName = icon.originalName,
+                            hasEdit = icon.editedPath != null,
+                        )
+                    }
+                    icon.sourcePath
+                }
+
+                is IconEditorTarget.PackIcon -> {
+                    originalPath = target.sourcePath
+                    // 一次性会话没有"已保存产物"的概念：保存即结束，不必提供"还原"
+                    _uiState.update { it.copy(loading = false) }
+                    target.sourcePath
+                }
             }
             val decoded = withContext(Dispatchers.IO) {
-                runCatching { processor.decodeForEditing(icon.sourcePath) }.getOrNull()
+                runCatching { processor.decodeForEditing(sourcePath) }.getOrNull()
             }
             if (decoded != null) {
                 sourceBitmap = decoded
@@ -107,19 +123,47 @@ class IconEditorViewModel(
     fun save() {
         viewModelScope.launch {
             _uiState.update { it.copy(saving = true) }
-            runCatching { repository.saveIconEdit(packId, slot, styleFlow.value) }
+            runCatching {
+                when (target) {
+                    is IconEditorTarget.Slot ->
+                        repository.saveIconEdit(target.packId, target.slot, styleFlow.value)
+
+                    // 图标包图标：只产出文件。写文件放 IO 线程，编码本身是 CPU 活
+                    is IconEditorTarget.PackIcon -> withContext(Dispatchers.IO) {
+                        val bytes = processor.encode(target.sourcePath, styleFlow.value)
+                        val out = File(target.outputPath)
+                        out.parentFile?.mkdirs()
+                        out.writeBytes(bytes)
+                        out.absolutePath
+                    }
+                }
+            }
                 .onSuccess {
-                    _uiState.update { it.copy(saving = false, hasEdit = true, message = UiText(R.string.editor_msg_saved), finished = true) }
+                    _uiState.update {
+                        it.copy(
+                            saving = false,
+                            // 一次性会话保存后即退出，"还原"入口没有意义
+                            hasEdit = target is IconEditorTarget.Slot,
+                            message = UiText(R.string.editor_msg_saved),
+                            finished = true,
+                        )
+                    }
                 }
                 .onFailure { failure ->
-                    _uiState.update { it.copy(saving = false, message = failure.uiMessage(R.string.editor_msg_save_failed)) }
+                    _uiState.update {
+                        it.copy(
+                            saving = false,
+                            message = failure.uiMessage(R.string.editor_msg_save_failed),
+                        )
+                    }
                 }
         }
     }
 
     fun reset() {
+        val slot = target as? IconEditorTarget.Slot ?: return
         viewModelScope.launch {
-            repository.clearIconEdit(packId, slot)
+            repository.clearIconEdit(slot.packId, slot.slot)
             _uiState.update { it.copy(hasEdit = false, message = UiText(R.string.editor_msg_reset)) }
         }
     }
@@ -144,8 +188,8 @@ class IconEditorViewModel(
     // a recycled bitmap" 崩溃。交给 GC 回收即可（API 26+ 位图已计入 Java 堆）。
 
     companion object {
-        fun factory(packId: Long, slot: Int): ViewModelProvider.Factory = viewModelFactory {
-            initializer { IconEditorViewModel(ServiceLocator.repository, packId, slot) }
+        fun factory(target: IconEditorTarget): ViewModelProvider.Factory = viewModelFactory {
+            initializer { IconEditorViewModel(ServiceLocator.repository, target) }
         }
     }
 }

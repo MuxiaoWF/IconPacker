@@ -1,11 +1,16 @@
 package com.muxiao.iconpacker.ui.mapping
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -30,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.muxiao.iconpacker.R
@@ -44,7 +50,8 @@ import com.muxiao.iconpacker.ui.components.ScrollableDialogContent
 import com.muxiao.iconpacker.ui.components.ToggleInfoRow
 import com.muxiao.iconpacker.ui.components.colorSwatchLabelRes
 import com.muxiao.iconpacker.ui.components.iconShapeLabel
-import com.muxiao.iconpacker.ui.theme.IconSize
+import com.muxiao.iconpacker.ui.theme.Layout
+import com.muxiao.iconpacker.ui.theme.LocalAppPalette
 import com.muxiao.iconpacker.ui.theme.Spacing
 
 /**
@@ -63,9 +70,15 @@ fun IconLibraryTab(
     iconTargets: Map<Int, List<AppRow>>,
     onIconClick: (IconAssetEntity) -> Unit,
 ) {
+    val palette = LocalAppPalette.current
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(96.dp),
-        contentPadding = PaddingValues(Spacing.lg),
+        columns = GridCells.Adaptive(92.dp),
+        contentPadding = PaddingValues(
+            start = Layout.pageHorizontal,
+            end = Layout.pageHorizontal,
+            top = Spacing.sm,
+            bottom = Spacing.xl,
+        ),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
@@ -73,15 +86,27 @@ fun IconLibraryTab(
             val icon = icons[index]
             val targets = iconTargets[icon.slot].orEmpty()
             val anyInstalled = targets.any { it.installed }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                // 图标整体落在固定网格单元中居中：大图不出界，小图不贴边
-                IconImage(
-                    path = icon.editedPath ?: icon.sourcePath,
-                    contentDescription = icon.originalName,
-                    modifier = Modifier
-                        .size(IconSize.grid)
-                        .clickable { onIconClick(icon) },
-                )
+            // 每个图标落在一张卡片里：旧版是裸图 + 彩色标签直接铺在页面底色上，
+            // 几十张图挨在一起没有边界，视线无处停靠
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(palette.card)
+                    .border(Layout.hairline, palette.divider, MaterialTheme.shapes.medium)
+                    .clickable { onIconClick(icon) }
+                    .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
+            ) {
+                // 图标本体 56dp：占单元约六成，留白由容器给，图片不贴边也不撑满
+                Box(modifier = Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+                    IconImage(
+                        path = icon.editedPath ?: icon.sourcePath,
+                        contentDescription = icon.originalName,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                Spacer(modifier = Modifier.size(Spacing.xs))
                 Text(
                     text = if (targets.isEmpty()) {
                         stringResource(R.string.mapping_unused_label)
@@ -89,11 +114,14 @@ fun IconLibraryTab(
                         stringResource(R.string.mapping_targets_count, targets.size)
                     },
                     style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
                     color = when {
                         targets.isEmpty() -> MaterialTheme.colorScheme.onSurfaceVariant
                         // 目标都还没装：映射已在，只是要等应用装上来（不是"未使用"）
-                        !anyInstalled -> MaterialTheme.colorScheme.tertiary
-                        else -> MaterialTheme.colorScheme.primary
+                        !anyInstalled -> palette.warning
+                        // "供 N 个 App"是被用上的常态，66 张图全用主色会让整屏泛蓝，
+                        // 主色只留给真正需要注意的待安装项
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
                     },
                 )
             }
@@ -155,10 +183,8 @@ fun IconDetailDialog(
                                 text = if (app.installed) {
                                     app.packageName
                                 } else {
-                                    stringResource(
-                                        R.string.mapping_target_pending_install,
-                                        app.packageName,
-                                    )
+                                    // 未安装时上一行已经是包名，这里再拼一次包名就是同句重复
+                                    stringResource(R.string.mapping_target_pending_short)
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,

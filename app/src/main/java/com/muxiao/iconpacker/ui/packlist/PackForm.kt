@@ -1,14 +1,22 @@
 package com.muxiao.iconpacker.ui.packlist
 
 import android.net.Uri
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -21,7 +29,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.core.packer.engine.MIN_SDK_FLOOR
 import com.muxiao.iconpacker.core.packer.engine.PackageNameRules
@@ -31,10 +42,13 @@ import com.muxiao.iconpacker.data.PackEntity
 import com.muxiao.iconpacker.data.PackSignConfig
 import com.muxiao.iconpacker.domain.PackVersionRules
 import com.muxiao.iconpacker.domain.messageRes
-import com.muxiao.iconpacker.ui.components.SectionHeader
+import com.muxiao.iconpacker.ui.components.AppChip
+import com.muxiao.iconpacker.ui.components.FormSection
 import com.muxiao.iconpacker.ui.components.ToggleInfoRow
 import com.muxiao.iconpacker.ui.components.UiText
 import com.muxiao.iconpacker.ui.components.asString
+import com.muxiao.iconpacker.ui.theme.IconSize
+import com.muxiao.iconpacker.ui.theme.Layout
 import com.muxiao.iconpacker.ui.theme.Spacing
 
 /** SDK 输入区间的上层只防误填（如把年份写进去），无引擎语义 */
@@ -66,10 +80,26 @@ class PackForm(source: PackEntity? = null, defaults: AppSettings.State? = null) 
     /** 新建流程临时选中的启动器图标（尚未落库；编辑流程的图标走即时回调） */
     var iconUri by mutableStateOf<Uri?>(null)
 
-    var importedKey by mutableStateOf(source?.signMode == PackEntity.SIGN_MODE_IMPORTED)
-    var keystorePath by mutableStateOf(source?.keystorePath ?: "")
+    /**
+     * 签名身份：编辑以库里的配置为准，新建才吃"设置 → 签名身份"的默认值。
+     *
+     * 默认值只带"方式 + 文件 + 别名"，密码永远为空——密码是可复用凭据，
+     * 不写进 SharedPreferences（见 AppSettings.State.importedKeystore 的说明）。
+     */
+    var importedKey by mutableStateOf(
+        if (source != null) {
+            source.signMode == PackEntity.SIGN_MODE_IMPORTED
+        } else {
+            defaults?.importedKeystore == true && defaults.keystorePath.isNotBlank()
+        },
+    )
+    var keystorePath by mutableStateOf(
+        if (source != null) source.keystorePath.orEmpty() else defaults?.keystorePath.orEmpty(),
+    )
     var keystorePassword by mutableStateOf(source?.keystorePassword ?: "")
-    var keystoreAlias by mutableStateOf(source?.keystoreAlias ?: "")
+    var keystoreAlias by mutableStateOf(
+        if (source != null) source.keystoreAlias.orEmpty() else defaults?.keystoreAlias.orEmpty(),
+    )
     var keyPassword by mutableStateOf(source?.keyPassword ?: "")
     var signerName by mutableStateOf(source?.signerName ?: defaults?.signerName ?: "")
     var schemeV1 by mutableStateOf(source?.signSchemeV1 ?: defaults?.schemeV1 ?: true)
@@ -160,12 +190,14 @@ class PackForm(source: PackEntity? = null, defaults: AppSettings.State? = null) 
         keystorePath = path
     }
 
-    fun clearKeystore() {
-        importedKey = false
+    /**
+     * 只清空选中的密钥库文件，保留"导入密钥库"开关与已填的别名/密码。
+     *
+     * 选错文件是局部问题，不该顺带把签名方式退回设备密钥、并抹掉已输入的凭据；
+     * 要整个退回设备签名，用户直接关掉上面的开关即可。
+     */
+    fun clearKeystoreFile() {
         keystorePath = ""
-        keystorePassword = ""
-        keystoreAlias = ""
-        keyPassword = ""
     }
 }
 
@@ -219,216 +251,355 @@ fun PackFormFields(
     installedVersionCode: Long? = null,
     currentPackVersionCode: Int? = null,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        OutlinedTextField(
-            value = form.name,
-            onValueChange = { form.name = it },
-            label = { Text(stringResource(R.string.form_pack_name)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        OutlinedTextField(
-            value = form.versionName,
-            onValueChange = { form.versionName = it },
-            label = { Text(stringResource(R.string.form_version_name)) },
-            singleLine = true,
-            isError = form.versionNameIssue != null,
-            supportingText = {
-                Text(
-                    text = form.versionNameIssue?.messageRes
-                        ?.let { stringResource(it) }
-                        ?: stringResource(R.string.form_version_name_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                )
-            },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        VersionCodeField(
-            form = form,
-            installedVersionCode = installedVersionCode,
-            currentPackVersionCode = currentPackVersionCode,
-        )
-        OutlinedTextField(
-            value = form.packageName,
-            onValueChange = { form.packageName = it },
-            label = { Text(stringResource(R.string.form_package_name_label)) },
-            singleLine = true,
-            isError = form.packageNameIssue != null,
-            supportingText = {
-                Text(
-                    text = form.packageNameIssue?.messageRes()
-                        ?.let { stringResource(it) }
-                        ?: stringResource(R.string.form_package_name_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                )
-            },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Text(
-            text = stringResource(R.string.form_sdk_section),
-            style = MaterialTheme.typography.bodySmall,
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    // 分区之间 24dp、组内 12dp；层级由"间距 + 发丝线 + 标题"承担，不再堆卡片
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Layout.sectionGap),
+    ) {
+        FormSection(
+            title = stringResource(R.string.form_section_basic),
+            // 首段不画线：顶栏已经给出了页面边界
+            showDivider = false,
         ) {
             OutlinedTextField(
-                value = form.minSdkInput,
-                onValueChange = { form.minSdkInput = it.filter(Char::isDigit).take(3) },
-                label = { Text("minSdk") },
+                value = form.name,
+                onValueChange = { form.name = it },
+                label = { Text(stringResource(R.string.form_pack_name)) },
                 singleLine = true,
-                isError = form.minSdkIssue != null,
-                supportingText = {
-                    val issue = form.minSdkIssue
-                    Text(
-                        text = issue?.asString()
-                            ?: stringResource(R.string.form_sdk_min_hint, MIN_SDK_FLOOR),
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
-                value = form.targetSdkInput,
-                onValueChange = { form.targetSdkInput = it.filter(Char::isDigit).take(3) },
-                label = { Text("targetSdk") },
+                value = form.versionName,
+                onValueChange = { form.versionName = it },
+                label = { Text(stringResource(R.string.form_version_name)) },
                 singleLine = true,
-                isError = form.targetSdkIssue != null,
+                isError = form.versionNameIssue != null,
                 supportingText = {
-                    val issue = form.targetSdkIssue
                     Text(
-                        text = issue?.asString()
-                            ?: stringResource(R.string.form_sdk_target_hint),
+                        text = form.versionNameIssue?.messageRes
+                            ?.let { stringResource(it) }
+                            ?: stringResource(R.string.form_version_name_hint),
                         style = MaterialTheme.typography.labelSmall,
                     )
                 },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            VersionCodeField(
+                form = form,
+                installedVersionCode = installedVersionCode,
+                currentPackVersionCode = currentPackVersionCode,
+            )
+            OutlinedTextField(
+                value = form.packageName,
+                onValueChange = { form.packageName = it },
+                label = { Text(stringResource(R.string.form_package_name_label)) },
+                singleLine = true,
+                isError = form.packageNameIssue != null,
+                supportingText = {
+                    Text(
+                        text = form.packageNameIssue?.messageRes()
+                            ?.let { stringResource(it) }
+                            ?: stringResource(R.string.form_package_name_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
             )
         }
 
-        ToggleInfoRow(
-            title = stringResource(R.string.form_show_in_drawer),
-            subtitle = if (form.showInDrawer) {
-                stringResource(R.string.form_show_in_drawer_on)
-            } else {
-                stringResource(R.string.form_show_in_drawer_off)
-            },
-            leading = {
-                Checkbox(
-                    checked = form.showInDrawer,
-                    onCheckedChange = { form.showInDrawer = it },
-                )
-            },
-        )
-
+        // 图标单独成段：它和上面的名称/包名不是一类东西，混在字段流里会被当成"又一个输入项"
         if (iconContent != null) {
-            Text(
-                text = if (onPickIcon == null) {
-                    stringResource(R.string.form_icon_section_optional)
+            FormSection(
+                title = stringResource(R.string.form_section_icon),
+                hint = stringResource(R.string.form_section_optional),
+            ) {
+                PackIconField(
+                    iconContent = iconContent,
+                    onPickIcon = onPickIcon,
+                    onClearIcon = onClearIcon,
+                )
+            }
+        }
+
+        FormSection(title = stringResource(R.string.form_section_build)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                OutlinedTextField(
+                    value = form.minSdkInput,
+                    onValueChange = { form.minSdkInput = it.filter(Char::isDigit).take(3) },
+                    label = { Text("minSdk") },
+                    singleLine = true,
+                    isError = form.minSdkIssue != null,
+                    supportingText = {
+                        val issue = form.minSdkIssue
+                        Text(
+                            text = issue?.asString()
+                                ?: stringResource(R.string.form_sdk_min_hint, MIN_SDK_FLOOR),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = form.targetSdkInput,
+                    onValueChange = { form.targetSdkInput = it.filter(Char::isDigit).take(3) },
+                    label = { Text("targetSdk") },
+                    singleLine = true,
+                    isError = form.targetSdkIssue != null,
+                    supportingText = {
+                        val issue = form.targetSdkIssue
+                        Text(
+                            text = issue?.asString()
+                                ?: stringResource(R.string.form_sdk_target_hint),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            ToggleInfoRow(
+                title = stringResource(R.string.form_show_in_drawer),
+                subtitle = if (form.showInDrawer) {
+                    stringResource(R.string.form_show_in_drawer_on)
                 } else {
-                    stringResource(R.string.form_icon_section)
+                    stringResource(R.string.form_show_in_drawer_off)
                 },
+                leading = {
+                    Checkbox(
+                        checked = form.showInDrawer,
+                        onCheckedChange = { form.showInDrawer = it },
+                    )
+                },
+            )
+        }
+
+        FormSection(title = stringResource(R.string.form_sign_section)) {
+            ToggleInfoRow(
+                title = stringResource(R.string.form_import_keystore),
+                subtitle = if (form.importedKey) {
+                    stringResource(R.string.form_import_keystore_on)
+                } else {
+                    stringResource(R.string.form_import_keystore_off)
+                },
+                leading = {
+                    Switch(checked = form.importedKey, onCheckedChange = { form.importedKey = it })
+                },
+            )
+            if (form.importedKey) {
+                // 与设置页"签名身份"里的密钥库行同构：左文件信息、右操作。
+                // 旧版是"一行文件名 + 另起一行两个文字按钮"，既不满宽也不成组
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.settings_keystore_file),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            // 私有目录全路径对用户没有意义，只回显文件名
+                            text = form.keystorePath.takeIf { it.isNotBlank() }
+                                ?.let { java.io.File(it).name }
+                                ?: stringResource(R.string.settings_keystore_not_chosen),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    // 选错文件时能退回去：只清空表单里的引用，不删私有目录里的副本
+                    // （其它项目/设置页可能还在用它）
+                    if (form.keystorePath.isNotBlank()) {
+                        TextButton(
+                            onClick = onClearKeystore,
+                            contentPadding = PaddingValues(horizontal = Spacing.sm),
+                        ) { Text(stringResource(R.string.common_clear)) }
+                    }
+                    TextButton(onClick = onPickKeystore) {
+                        Text(
+                            stringResource(
+                                if (form.keystorePath.isBlank()) {
+                                    R.string.form_pick_keystore
+                                } else {
+                                    R.string.settings_keystore_replace
+                                },
+                            ),
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = form.keystorePassword,
+                    onValueChange = { form.keystorePassword = it },
+                    label = { Text(stringResource(R.string.form_keystore_password)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = form.keystoreAlias,
+                    onValueChange = { form.keystoreAlias = it },
+                    label = { Text(stringResource(R.string.form_key_alias)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = form.keyPassword,
+                    onValueChange = { form.keyPassword = it },
+                    label = { Text(stringResource(R.string.form_key_password)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            OutlinedTextField(
+                value = form.signerName,
+                onValueChange = { form.signerName = it },
+                label = { Text(stringResource(R.string.form_signer_name)) },
+                singleLine = true,
+                supportingText = {
+                    Text(
+                        text = stringResource(R.string.form_signer_name_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = stringResource(R.string.form_schemes),
                 style = MaterialTheme.typography.bodySmall,
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                iconContent()
-                Spacer(modifier = Modifier.width(Spacing.md))
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                AppChip(
+                    selected = form.schemeV1,
+                    label = "v1·JAR",
+                    onClick = { form.schemeV1 = !form.schemeV1 },
+                )
+                AppChip(
+                    selected = form.schemeV2,
+                    label = "v2",
+                    onClick = { form.schemeV2 = !form.schemeV2 },
+                )
+                AppChip(
+                    selected = form.schemeV3,
+                    label = "v3",
+                    onClick = { form.schemeV3 = !form.schemeV3 },
+                )
+            }
+            val signIssue = form.signIssue
+            if (signIssue != null) {
+                Text(
+                    text = signIssue.asString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 启动器图标行：缩略图 + 状态说明 + 操作，三者同属一组。
+ *
+ * 归类靠**结构**而不是靠像素偏移：操作放进文字列内部，左边界由 Column 决定，
+ * 与上方状态文字天然对齐。之前的写法是把操作另起一行、再手算
+ * "缩略图宽 + 间距"的缩进——缩略图尺寸一变就错位，且那一行看起来像
+ * 页面级的又一条目，正是"和上面混为一谈"的来源。
+ *
+ * 操作的两个文字按钮去掉水平内边距：不加的话按钮文字会比状态文字再右偏 12dp，
+ * 视觉上又不齐；按钮高度仍由 M3 的 48dp 触控下限保证。
+ */
+@Composable
+private fun PackIconField(
+    iconContent: @Composable () -> Unit,
+    onPickIcon: (() -> Unit)?,
+    onClearIcon: (() -> Unit)?,
+) {
+    // 是否已设置由 onClearIcon 的存在与否表达，与调用方（form.iconUri / pack.iconPath）
+    // 保持单一事实来源，不额外传 boolean 造成两处判断可能不一致
+    val hasIcon = onClearIcon != null
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        // 顶对齐 + 与缩略图等高的文字块：两行说明和图标共用同一条中轴。
+        // 若按旧写法让整行居中，居中的是"说明 + 按钮"这一整块（约 100dp），
+        // 图标只有 52dp，就会被推到两行之间偏下的位置——看起来像配在"选择图片"旁边，
+        // 而不是在解释这个图标。
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(
+            modifier = if (onPickIcon != null) {
+                Modifier
+                    .clip(MaterialTheme.shapes.medium)
+                    .clickable(onClick = onPickIcon)
+            } else {
+                Modifier
+            },
+            contentAlignment = Alignment.Center,
+        ) {
+            iconContent()
+        }
+        Spacer(modifier = Modifier.width(Spacing.md))
+        Column(modifier = Modifier.weight(1f)) {
+            // 文字区至少与缩略图同高并垂直居中，超长（大字号/英文折三行）时自然撑开
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = IconSize.thumb),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    text = if (hasIcon) {
+                        stringResource(R.string.form_icon_set_subtitle)
+                    } else {
+                        stringResource(R.string.form_icon_unset_subtitle)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            // 用 FlowRow 保证英文（"Change image" + "Remove icon"）在窄屏不溢出
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
                 if (onPickIcon != null) {
-                    TextButton(onClick = onPickIcon) { Text(stringResource(R.string.form_pick_image)) }
+                    TextButton(
+                        onClick = onPickIcon,
+                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+                        modifier = Modifier.heightIn(min = Layout.touchTarget),
+                    ) {
+                        Text(
+                            stringResource(
+                                if (hasIcon) R.string.form_change_image else R.string.form_pick_image,
+                            ),
+                        )
+                    }
                 }
                 if (onClearIcon != null) {
-                    TextButton(onClick = onClearIcon) { Text(stringResource(R.string.common_clear)) }
+                    TextButton(
+                        onClick = onClearIcon,
+                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+                        modifier = Modifier.heightIn(min = Layout.touchTarget),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.size(IconSize.inline),
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                        Spacer(modifier = Modifier.width(Spacing.xs))
+                        Text(
+                            text = stringResource(R.string.form_remove_icon),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             }
-        }
-
-        SectionHeader(stringResource(R.string.form_sign_section))
-        ToggleInfoRow(
-            title = stringResource(R.string.form_import_keystore),
-            subtitle = if (form.importedKey) {
-                stringResource(R.string.form_import_keystore_on)
-            } else {
-                stringResource(R.string.form_import_keystore_off)
-            },
-            leading = {
-                Switch(checked = form.importedKey, onCheckedChange = { form.importedKey = it })
-            },
-        )
-        if (form.importedKey) {
-            Text(
-                text = form.keystorePath.ifBlank { stringResource(R.string.form_keystore_not_chosen) },
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                TextButton(onClick = onPickKeystore) { Text(stringResource(R.string.form_pick_keystore)) }
-                if (form.keystorePath.isNotBlank()) {
-                    TextButton(onClick = onClearKeystore) { Text(stringResource(R.string.common_clear)) }
-                }
-            }
-            OutlinedTextField(
-                value = form.keystorePassword,
-                onValueChange = { form.keystorePassword = it },
-                label = { Text(stringResource(R.string.form_keystore_password)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = form.keystoreAlias,
-                onValueChange = { form.keystoreAlias = it },
-                label = { Text(stringResource(R.string.form_key_alias)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = form.keyPassword,
-                onValueChange = { form.keyPassword = it },
-                label = { Text(stringResource(R.string.form_key_password)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        OutlinedTextField(
-            value = form.signerName,
-            onValueChange = { form.signerName = it },
-            label = { Text(stringResource(R.string.form_signer_name)) },
-            singleLine = true,
-            supportingText = {
-                Text(
-                    text = stringResource(R.string.form_signer_name_hint),
-                    style = MaterialTheme.typography.labelSmall,
-                )
-            },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Text(
-            text = stringResource(R.string.form_schemes),
-            style = MaterialTheme.typography.bodySmall,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            FilterChip(
-                selected = form.schemeV1,
-                onClick = { form.schemeV1 = !form.schemeV1 },
-                label = { Text("v1·JAR") },
-            )
-            FilterChip(
-                selected = form.schemeV2,
-                onClick = { form.schemeV2 = !form.schemeV2 },
-                label = { Text("v2") },
-            )
-            FilterChip(
-                selected = form.schemeV3,
-                onClick = { form.schemeV3 = !form.schemeV3 },
-                label = { Text("v3") },
-            )
-        }
-        val signIssue = form.signIssue
-        if (signIssue != null) {
-            Text(
-                text = signIssue.asString(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
-            )
         }
     }
 }
@@ -481,6 +652,8 @@ private fun VersionCodeField(
                 )
             }
         },
+        // 少了这一行就会退到 M3 的 280dp 默认最小宽度，比同列其它字段短 40dp
+        modifier = Modifier.fillMaxWidth(),
     )
 }
 

@@ -35,6 +35,20 @@
     <string name="settings_default_signer_name">默认签名者名</string>
     <string name="settings_default_signer_name_hint">v1 签名条目使用的文件名；留空则用内置默认</string>
     <string name="settings_default_schemes">默认签名方案</string>
+    <string name="settings_section_signing">签名身份</string>
+    <string name="settings_sign_mode_device">设备密钥</string>
+    <string name="settings_sign_mode_imported">导入密钥库</string>
+    <string name="settings_sign_mode_device_desc">密钥在本机 AndroidKeyStore 生成，不可导出；每个图标包各自独立，换设备后无法覆盖旧安装。</string>
+    <string name="settings_sign_mode_imported_desc">用你自己的密钥库签名：同一身份可在多台设备上产出一致的包，便于覆盖安装。</string>
+    <string name="settings_keystore_file">密钥库文件</string>
+    <string name="settings_keystore_not_chosen">未选择</string>
+    <string name="settings_keystore_pick">选择文件</string>
+    <string name="settings_keystore_replace">更换</string>
+    <string name="settings_keystore_alias">默认密钥别名</string>
+    <string name="settings_keystore_password_note">密码不保存在设置里：它是可复用的凭据，新建或编辑项目时再输入。</string>
+    <string name="settings_keystore_clear">清除默认签名身份</string>
+    <string name="settings_keystore_imported">已导入 %1$s</string>
+    <string name="settings_keystore_import_failed">导入失败：%1$s</string>
     <string name="settings_schemes_all_off">已全部关闭：新建设置保存时会被要求至少保留一种签名方案，「创建」按钮将处于禁用状态</string>
     <string name="settings_section_artifact_template">导出产物文件名模板</string>
     <string name="settings_artifact_template">文件名模板</string>
@@ -44,7 +58,6 @@
     <string name="settings_footer_note">说明：这些只是「新建时的预填值」，已建项目各自的配置不受影响。</string>
 
     <!-- ===== 首次启动引导 ===== -->
-    <string name="onboarding_title">欢迎使用 IconPacker</string>
     <string name="onboarding_intro">IconPacker 让你上传自有图标，一键打包成可安装的图标包 APK。</string>
     <string name="onboarding_prereq_title">使用前提：兼容的启动器</string>
     <string name="onboarding_prereq_body">多数 OEM 系统启动器（Pixel Launcher、One UI Home、MIUI 等）使用自有主题机制，不直接应用标准第三方图标包；最稳妥的方式是安装一个支持图标包的启动器（如 Nova、Lawnchair、Apex），并在其图标样式设置里启用本应用生成的图标包。</string>
@@ -87,16 +100,12 @@
     <string name="packlist_import">导入</string>
     <string name="packlist_importing">导入中</string>
     <string name="cd_settings">设置</string>
-    <string name="cd_create_pack">新建图标包</string>
-    <string name="packlist_empty">还没有图标包。\n点击右下角按钮创建第一个，然后导入图标、映射到应用、一键打包。</string>
     <string name="packlist_backup_filename">%1$s-备份.zip</string>
     <string name="packlist_delete_title">删除图标包</string>
     <string name="packlist_delete_confirm">将删除「%1$s」及其全部映射、图标与打包产物，且不可恢复。</string>
-    <string name="packlist_version_status">版本 %1$s（v%2$d）· %3$s</string>
     <string name="pack_status_never_packed">未打包</string>
     <string name="pack_status_dirty">有未提交修改</string>
     <string name="pack_status_packed">已打包</string>
-    <string name="packlist_next_version">下次打包 v%1$d（已指定）</string>
     <string name="packlist_install_not_installed">未安装</string>
     <string name="packlist_install_latest">已是最新</string>
     <string name="packlist_install_update">可更新（已装 v%1$d → v%2$d）</string>
@@ -121,6 +130,7 @@
     <!-- ===== 消息（项目列表 VM） ===== -->
     <string name="msg_version_code_invalid">版本号必须是大于 0 的整数</string>
     <string name="msg_keystore_read_failed">无法读取密钥库文件：%1$s</string>
+    <string name="msg_icon_read_failed">无法读取所选图片，请换一张试试</string>
     <string name="msg_pack_created_icon_failed">已创建图标包，但图标设置失败：%1$s</string>
     <string name="msg_create_failed">创建失败：%1$s</string>
     <string name="msg_sign_config_updated">签名配置已更新</string>
@@ -156,7 +166,6 @@
     <string name="form_version_code_preview">下次打包将使用 v%1$d；清空则回到自动递增</string>
     <string name="form_package_name_label">包名（可选，留空自动生成）</string>
     <string name="form_package_name_hint">每个图标包需要独立包名才能在系统里共存；改包名后要重新打包安装，旧包名会作为独立应用留在设备上（可自行卸载）</string>
-    <string name="form_sdk_section">产物 SDK（可选，留空沿用模板）</string>
     <string name="form_sdk_min_hint">留空沿用模板（%1$d）；抬高可拦掉装不上的老机型</string>
     <string name="form_sdk_target_hint">留空沿用模板；一般不带 minSdk 单独抬高</string>
     <string name="err_min_sdk_range">minSdk 需在 %1$d～%2$d 之间</string>
@@ -165,15 +174,20 @@
     <string name="form_show_in_drawer">在应用抽屉显示</string>
     <string name="form_show_in_drawer_on">抽屉里能看到这个图标包，点开是启用提示</string>
     <string name="form_show_in_drawer_off">只作为主题资源，不占抽屉位置</string>
-    <string name="form_icon_section">图标（在启动器里显示）</string>
-    <string name="form_icon_section_optional">图标（在启动器里显示），可选</string>
+    <string name="form_section_basic">基本信息</string>
+    <string name="form_section_icon">启动器图标</string>
+    <string name="form_section_build">打包与显示</string>
+    <string name="form_section_optional">可选</string>
     <string name="form_pick_image">选择图片</string>
+    <string name="form_change_image">更换图片</string>
+    <string name="form_remove_icon">移除图标</string>
+    <string name="form_icon_set_subtitle">已使用编辑后的图标；更换或移除都不影响已映射的图标</string>
+    <string name="form_icon_unset_subtitle">未选择；选图后可先裁剪调形（不选则用模板默认图）</string>
     <string name="common_clear">清除</string>
     <string name="form_sign_section">签名设置</string>
     <string name="form_import_keystore">使用导入的密钥库</string>
     <string name="form_import_keystore_on">用你自己的密钥签名，所有设备产出的图标包可用同一身份互相覆盖</string>
     <string name="form_import_keystore_off">默认：密钥在本机 Keystore 生成，不可导出</string>
-    <string name="form_keystore_not_chosen">尚未选择密钥库文件</string>
     <string name="form_pick_keystore">选择密钥库文件</string>
     <string name="form_keystore_password">密钥库密码</string>
     <string name="form_key_alias">密钥别名</string>
@@ -221,13 +235,18 @@
     <string name="cd_auto_match">一键自动匹配</string>
     <string name="mapping_import_album">相册导入</string>
     <string name="mapping_import_zip">ZIP 导入</string>
-    <string name="mapping_progress">已映射 %1$d / %2$d · 图标 %3$d</string>
     <string name="common_build">打包</string>
     <string name="mapping_tab_apps">应用 %1$d</string>
     <string name="mapping_tab_icons">图标 %1$d</string>
     <string name="mapping_search_apps">搜索应用</string>
     <string name="mapping_add_target">添加映射</string>
     <string name="mapping_only_unmapped">只看未映射</string>
+    <string name="mapping_only_unused">只看未使用</string>
+    <string name="mapping_subtitle_unmapped_apps">未映射 %1$d 个</string>
+    <string name="mapping_subtitle_unused_icons">未使用 %1$d 个</string>
+    <string name="mapping_apps_all_mapped_title">应用都已映射</string>
+    <string name="mapping_icons_all_used_title">图标全部用上了</string>
+    <string name="mapping_icons_all_used_body">关掉顶栏的筛选按钮即可看到全部图标</string>
     <string name="mapping_all_mapped_done">已安装应用全部映射完毕；给未安装的应用指图标可点「添加映射」</string>
     <string name="mapping_icon_count">共 %1$d 个图标</string>
     <string name="mapping_unify_shape">统一形状</string>
@@ -245,6 +264,8 @@
     <string name="common_search">搜索</string>
     <string name="mapping_no_match">没有匹配的应用</string>
     <string name="mapping_pick_icon_title">选择图标（%1$d）</string>
+    <string name="mapping_pick_icon_current">当前使用的图标</string>
+    <string name="mapping_clear_assignment">清除图标映射</string>
     <string name="mapping_icons_pool_empty">图标池是空的，请先通过上方按钮导入图标。</string>
     <string name="err_mapping_target_empty">请输入包名，或点「从应用列表选择」</string>
     <string name="err_mapping_target_not_installed">本机没有安装 %1$s，无法确定它的启动入口。可以先安装该应用，或补全成组件形式（如 %1$s/.MainActivity）。</string>
@@ -255,7 +276,7 @@
     <string name="mapping_targets_count">供 %1$d 个 App</string>
     <string name="mapping_detail_no_targets">未分配给任何应用</string>
     <string name="mapping_detail_header">供 %1$d 个应用使用：</string>
-    <string name="mapping_target_pending_install">%1$s · 未安装，装上后自动生效</string>
+    <string name="mapping_target_pending_short">未安装 · 装上后自动生效</string>
     <string name="cd_remove_target">移除这条映射</string>
     <string name="mapping_add_target_by_name">添加映射（指定包名）</string>
     <string name="mapping_edit_icon">编辑图标</string>
@@ -277,6 +298,7 @@
     <string name="msg_retarget_displaced">映射已改指向 %1$s（该目标原有的映射被替换）</string>
     <string name="msg_retarget">映射已改指向 %1$s</string>
     <string name="msg_reassign_icon">已将 %1$s 的映射改到这张图标上（它原有的映射已被替换）</string>
+    <string name="msg_unassign">已清除 %1$s 的图标映射</string>
     <string name="msg_automatch_added">自动匹配新增 %1$d 个映射</string>
     <string name="msg_automatch_none">没有找到可自动匹配的应用</string>
     <string name="msg_import_failed">导入失败：%1$s</string>
@@ -303,6 +325,7 @@
 
     <!-- ===== 图标编辑页（FR-05） ===== -->
     <string name="editor_title">编辑图标</string>
+    <string name="editor_title_pack_icon">编辑图标包图标</string>
     <string name="editor_section_crop">裁剪</string>
     <string name="editor_crop_hint">拖动移动取景框，双指缩放；框内区域即最终图标（正方形）。</string>
     <string name="editor_zoom_label">缩放 %1$s×</string>
@@ -310,12 +333,10 @@
     <string name="editor_source_loading">源图加载中…</string>
     <string name="editor_background_on">已开启：内容四周会填色</string>
     <string name="editor_background_off">默认不加背景，只保留图标本身</string>
-    <string name="editor_border_title">边框</string>
     <string name="editor_border_on">已开启：沿外形描边</string>
     <string name="editor_border_off">默认不加边框</string>
     <string name="editor_border_width">粗细 %1$d%%（占图标边长）</string>
     <string name="editor_border_color">颜色</string>
-    <string name="editor_scale_label">内容缩放 %1$d%%</string>
     <string name="editor_scale_fill">（铺满）</string>
     <string name="editor_scale_hint">未开启背景/边框时缩小内容会留出透明边距。</string>
     <string name="editor_overwrite_warn">当前图标已保存过编辑产物，再次保存将覆盖；还原可恢复原图。</string>
@@ -352,8 +373,6 @@
     <string name="common_back">返回</string>
     <string name="build_enable_hint">启用方式：Nova → 设置 → 外观 → 图标样式 → 图标主题；Lawnchair → 主页设置 → 常规 → 图标样式；Apex → 设置 → 主题 → 图标包。</string>
     <string name="build_success_title">打包完成</string>
-    <string name="build_size_signer">大小 %1$s · 签名者 %2$s</string>
-    <string name="build_version_line">版本 %1$s（v%2$d）</string>
     <string name="build_sdk_rewrite_note"> · SDK 重写：%1$s</string>
     <string name="common_install">安装</string>
     <string name="build_share">分享</string>
@@ -366,4 +385,29 @@
     <string name="msg_build_share_failed">分享失败：%1$s</string>
     <string name="msg_build_open_launcher_failed">无法打开启动器</string>
     <string name="msg_build_no_launcher">未找到第三方启动器</string>
+
+    <!-- ===== 版式重构（2026-10）：摘要、空态、指标标签 ===== -->
+    <string name="packlist_count">共 %1$d 个图标包</string>
+    <string name="packlist_meta">%1$s（v%2$d）· %3$s</string>
+    <string name="packlist_next_version_short">下次 v%1$d</string>
+    <string name="packlist_empty_title">还没有图标包</string>
+    <string name="packlist_empty_body">导入图标、映射到应用，一键打包成可安装的图标包 APK。</string>
+    <string name="packlist_new">新建</string>
+    <string name="mapping_metric_apps">应用</string>
+    <string name="mapping_metric_mapped">已映射</string>
+    <string name="mapping_metric_icons">图标</string>
+    <string name="mapping_apps_empty">没有匹配的应用</string>
+    <string name="mapping_icons_empty_title">还没有图标</string>
+    <string name="editor_preview_hint">预览与打包结果一致</string>
+    <string name="editor_group_scale">内容缩放</string>
+    <string name="editor_group_border">边框</string>
+    <string name="build_metric_size">大小</string>
+    <string name="build_metric_version">版本</string>
+    <string name="build_metric_signer">签名者</string>
+    <string name="build_status_ready">准备就绪</string>
+    <string name="build_status_ready_body">共 %1$d 个应用映射，确认无误后开始打包</string>
+    <string name="build_status_running">正在打包</string>
+    <string name="build_status_done_body">产物已生成，可直接安装或分享</string>
+    <string name="build_status_failed_body">查看下方提示，处理后重试</string>
+    <string name="onboarding_brand_subtitle">图标包制作工具</string>
 </resources>

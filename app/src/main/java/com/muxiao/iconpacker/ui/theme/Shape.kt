@@ -2,12 +2,14 @@ package com.muxiao.iconpacker.ui.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
-import androidx.compose.ui.unit.dp
 
-/** 全局形状：卡片/对话框用 large，缩略图与分组块用 medium，小徽标用 small */
+/**
+ * 全局形状：卡片 18dp、二级容器 14dp、徽标与缩略图 10dp。
+ * 圆角阶梯收敛到「大容器大圆角、小元素小圆角」，不再出现 24dp 的胶囊感卡片。
+ */
 val AppShapes = Shapes(
-    small = RoundedCornerShape(8.dp),
-    medium = RoundedCornerShape(12.dp),
-    large = RoundedCornerShape(16.dp),
-    extraLarge = RoundedCornerShape(24.dp),
+    small = RoundedCornerShape(Radius.sm),
+    medium = RoundedCornerShape(Radius.md),
+    large = RoundedCornerShape(Radius.lg),
+    extraLarge = RoundedCornerShape(Radius.xl),
 )

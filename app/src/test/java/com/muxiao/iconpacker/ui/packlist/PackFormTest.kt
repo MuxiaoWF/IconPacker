@@ -113,15 +113,20 @@ class PackFormTest {
     }
 
     @Test
-    fun 清除密钥同时复位导入子项() {
+    fun 清除密钥库文件只清路径不动其它字段() {
         val form = PackForm()
         form.name = "测试包"
         form.importedKey = true
+        form.keystorePath = "/data/user/0/com.muxiao.iconpacker/files/ks.keystore"
         form.keystorePassword = "pw"
         form.keystoreAlias = "key0"
-        form.clearKeystore()
-        assertFalse(form.importedKey)
-        assertTrue(form.keystorePath.isEmpty() && form.keystorePassword.isEmpty() && form.keystoreAlias.isEmpty())
-        assertTrue(form.isValid)
+        form.clearKeystoreFile()
+        // 只是"这个文件选错了"：签名方式与已填凭据都不该被牵连
+        assertTrue(form.importedKey)
+        assertTrue(form.keystorePath.isEmpty())
+        assertEquals("pw", form.keystorePassword)
+        assertEquals("key0", form.keystoreAlias)
+        // 少了文件就无法打包，保存按钮必须拦住
+        assertFalse(form.isValid)
     }
 }

@@ -56,7 +56,14 @@ data class MappingUiState(
      *  "这张图有没有被用上"，把预置映射排除掉会让那批图标显示成"未使用"。 */
     val iconTargets: Map<Int, List<AppRow>> = emptyMap(),
     val query: String = "",
-    /** 只看未映射的应用（应用多时逐行找未映射项太费劲） */
+    /**
+     * 只看未映射。**两个 Tab 共用**，但"未映射"的含义各自成立：
+     * - 应用：还没有指派任何图标（`assignedSlot == null`）；
+     * - 图标：还没有任何应用用它（反查表里查不到，`iconTargets[slot]` 为空）。
+     *
+     * 两边问的是同一个问题——"还有哪些没有配对"——所以共用一个开关，
+     * 而不是给图标再发明一个"只看未使用"，否则同一屏里会出现两个语义相近的开关。
+     */
     val onlyUnmapped: Boolean = false,
     val loading: Boolean = true,
     val importing: Boolean = false,
@@ -73,6 +80,19 @@ data class MappingUiState(
                     app.packageName.contains(query, ignoreCase = true)
             }
             .toList()
+
+    /**
+     * 未使用的图标：反查表里没有它。
+     *
+     * 注意"有映射但目标没装"不算未使用——图标确实被指派了，只是等应用装上来，
+     * 把它算成未使用会让人以为要重新挑一张图。
+     */
+    val unusedIcons: List<IconAssetEntity>
+        get() = icons.filter { iconTargets[it.slot].isNullOrEmpty() }
+
+    /** 图标库当前应显示的图标（受同一个"只看未映射"开关约束） */
+    val visibleIcons: List<IconAssetEntity>
+        get() = if (onlyUnmapped) unusedIcons else icons
 }
 
 class MappingViewModel(
@@ -215,7 +235,15 @@ class MappingViewModel(
     }
 
     fun unassign(component: String) {
-        viewModelScope.launch { repository.removeMapping(packId, component) }
+        viewModelScope.launch {
+            repository.removeMapping(packId, component)
+            // 清除是不可见的状态变化（行会退回"未映射"），给一句回执才确定点中了。
+            // 优先用应用名——用户认的是"Clash Meta"，不是包名
+            val target = uiState.value.apps.firstOrNull { it.component == component }?.label
+                ?: IconPackManifest.packageOfComponent(component)
+                ?: component
+            messageFlow.value = listOf(UiText(R.string.msg_unassign, target))
+        }
     }
 
     fun autoMatch() {

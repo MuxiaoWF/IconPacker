@@ -4,7 +4,12 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,26 +17,34 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -44,17 +57,31 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,18 +92,38 @@ import com.muxiao.iconpacker.data.IconAssetEntity
 import com.muxiao.iconpacker.domain.ImportBinder
 import com.muxiao.iconpacker.domain.MappingTarget
 import com.muxiao.iconpacker.ui.IconImage
+import com.muxiao.iconpacker.ui.components.AppDivider
 import com.muxiao.iconpacker.ui.components.AppScaffold
 import com.muxiao.iconpacker.ui.components.EmptyState
+import com.muxiao.iconpacker.ui.components.MetricItem
+import com.muxiao.iconpacker.ui.components.MetricStrip
 import com.muxiao.iconpacker.ui.components.ScrollableDialogContent
+import com.muxiao.iconpacker.ui.components.SectionCard
+import com.muxiao.iconpacker.ui.components.StatusBadge
+import com.muxiao.iconpacker.ui.components.ThumbnailBox
+import com.muxiao.iconpacker.ui.components.Tone
 import com.muxiao.iconpacker.ui.components.asString
+import com.muxiao.iconpacker.ui.icons.AppIcons
 import com.muxiao.iconpacker.ui.theme.IconSize
+import com.muxiao.iconpacker.ui.theme.Layout
+import com.muxiao.iconpacker.ui.theme.LocalAppPalette
+import com.muxiao.iconpacker.ui.theme.Motion
 import com.muxiao.iconpacker.ui.theme.Spacing
 import com.muxiao.iconpacker.ui.toImageBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 /** 待指派图标的目标；[from] 非空表示这是"改包名"：那条映射将从 [from] 改挂到 [component] */
 private data class AssignTarget(val component: String, val from: String?)
+
+/**
+ * 惯性阶段头卡的收缩倍率。
+ *
+ * 拖拽时头卡与手指 1:1 收；松手后的惯性按 1.5 倍收，让它在列表继续滚之前先走完——
+ * 否则快甩一次会停在"半张卡挂在列表上方"的中间态，看起来像布局坏了。
+ */
+private const val FLING_COLLAPSE_BOOST = 1.5f
 
 /**
  * 包名编辑对话框的初值；[from] 非空表示编辑既有映射。
@@ -146,60 +193,137 @@ fun MappingScreen(
 
     AppScaffold(
         title = state.packName.ifBlank { stringResource(R.string.mapping_title_fallback) },
+        // 筛选改到顶栏后只剩一个图标，光靠着色不足以说明"现在是否在筛"，
+        // 用副标题把状态和筛选后的数量明说出来（顶栏高度固定，开关切换不会引起跳动）
+        subtitle = if (state.onlyUnmapped) {
+            if (selectedTab == 0) {
+                stringResource(R.string.mapping_subtitle_unmapped_apps, state.visibleApps.size)
+            } else {
+                stringResource(R.string.mapping_subtitle_unused_icons, state.visibleIcons.size)
+            }
+        } else {
+            null
+        },
         snackbarHostState = snackbarHostState,
         onBack = onBack,
         actions = {
+            // 筛选与刷新并列：两者都作用于"当前列表的读法"，放在一起；
+            // 打包是产物级操作，独立在最右，不与它们混排
+            IconToggleButton(
+                checked = state.onlyUnmapped,
+                onCheckedChange = { viewModel.setOnlyUnmapped(it) },
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(IconSize.actionChip)
+                        .clip(CircleShape)
+                        .background(
+                            if (state.onlyUnmapped) {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                            } else {
+                                Color.Transparent
+                            },
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = AppIcons.FilterFunnel,
+                        // 两栏的"未映射"不是一回事：应用是没指派图标，图标是没被引用，
+                        // 无障碍朗读按当前栏给词，与副标题一致
+                        contentDescription = stringResource(
+                            if (selectedTab == 0) {
+                                R.string.mapping_only_unmapped
+                            } else {
+                                R.string.mapping_only_unused
+                            },
+                        ),
+                        modifier = Modifier.size(IconSize.actionGlyph),
+                        tint = if (state.onlyUnmapped) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+            }
             IconButton(onClick = viewModel::autoMatch) {
                 Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.cd_auto_match))
             }
+            // 主操作固定在顶栏：旧版夹在"进度文字"右侧，随页面滚动离开视口，
+            // 用户在长列表里要一路滑回顶部才能打包
+            Button(
+                onClick = onBuild,
+                enabled = state.mappedCount > 0,
+                contentPadding = PaddingValues(horizontal = Spacing.lg),
+                modifier = Modifier.padding(end = Spacing.md),
+            ) {
+                Text(stringResource(R.string.common_build))
+            }
         },
     ) { innerPadding ->
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            // 导入通道 + 进度（两个 Tab 共用）
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AssistChip(
-                    onClick = {
+        // 头卡随列表收起。不能在滚动容器外面直接改高度：每帧改布局却不接管位移，
+        // 手势会和布局互相拉扯（内容被推两次）。这里用嵌套滚动把位移真正吃下来——
+        // 上滑先把头卡收掉，列表回到顶部后，多余的位移才用来把头卡放回来。
+        var collapsedPx by remember { mutableFloatStateOf(0f) }
+        var headerPx by remember { mutableIntStateOf(0) }
+        val collapseConnection = remember {
+            object : NestedScrollConnection {
+                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                    if (available.y >= 0f) return Offset.Zero
+                    val remaining = headerPx - collapsedPx
+                    if (remaining <= 0f) return Offset.Zero
+                    val step = -available.y
+                    // 松手后的惯性（SideEffect）按 1.5 倍折算：头卡比列表先走完，
+                    // 否则一次快甩会留下"半张卡挂在列表上方"的尴尬中间态。
+                    val weight = if (source == NestedScrollSource.SideEffect) FLING_COLLAPSE_BOOST else 1f
+                    val before = collapsedPx
+                    collapsedPx = (collapsedPx + step * weight).coerceAtMost(headerPx.toFloat())
+                    // 只声明与实际收卡量对应的位移：不能吃超过 available，多出来要还给列表
+                    return Offset(0f, -((collapsedPx - before) / weight).coerceAtMost(step))
+                }
+
+                override fun onPostScroll(
+                    consumed: Offset,
+                    available: Offset,
+                    source: NestedScrollSource,
+                ): Offset {
+                    // 只有手指下拽才把头卡放回来：惯性滚到顶时自动弹开会很突兀
+                    if (source != NestedScrollSource.UserInput) return Offset.Zero
+                    // 子列表一点都没吃掉（已经在顶部），剩下的位移才归头卡
+                    if (available.y <= 0f || consumed.y != 0f || collapsedPx <= 0f) return Offset.Zero
+                    val delta = available.y.coerceAtMost(collapsedPx)
+                    collapsedPx -= delta
+                    return Offset(0f, delta)
+                }
+            }
+        }
+        // 换栏等于换了一份列表（新列表在顶部），头卡跟着回到展开态
+        LaunchedEffect(selectedTab) { collapsedPx = 0f }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .nestedScroll(collapseConnection),
+        ) {
+            CollapsingHeader(collapsedPx = collapsedPx) {
+                MappingHeaderCard(
+                    appsCount = state.apps.size,
+                    mappedCount = state.mappedCount,
+                    iconsCount = state.icons.size,
+                    importing = state.importing,
+                    onImportAlbum = {
                         photoPicker.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                         )
                     },
-                    label = { Text(stringResource(R.string.mapping_import_album)) },
+                    onImportZip = { zipPicker.launch(arrayOf("application/zip")) },
+                    // 完整高度在布局阶段回填，收起量按它计算
+                    onHeightMeasured = { if (it != headerPx) headerPx = it },
                 )
-                AssistChip(
-                    onClick = { zipPicker.launch(arrayOf("application/zip")) },
-                    label = { Text(stringResource(R.string.mapping_import_zip)) },
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                if (state.importing) {
-                    CircularProgressIndicator(modifier = Modifier.size(IconSize.progressSmall))
-                }
             }
 
-            // 映射进度与打包入口
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(
-                        R.string.mapping_progress,
-                        state.mappedCount,
-                        state.apps.size,
-                        state.icons.size,
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Button(onClick = onBuild, enabled = state.mappedCount > 0) {
-                    Text(stringResource(R.string.common_build))
-                }
-            }
-
+            // 筛选已收进顶栏，不再独占横带；状态与筛选后的数量由副标题承担
             PrimaryTabRow(selectedTabIndex = selectedTab) {
                 Tab(
                     selected = selectedTab == 0,
@@ -218,57 +342,67 @@ fun MappingScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = Spacing.lg, end = Spacing.sm, top = Spacing.sm),
+                            .padding(start = Layout.pageHorizontal, end = Spacing.md, top = Spacing.sm),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        OutlinedTextField(
+                        SearchField(
                             value = state.query,
                             onValueChange = viewModel::setQuery,
-                            label = { Text(stringResource(R.string.mapping_search_apps)) },
-                            singleLine = true,
+                            placeholder = stringResource(R.string.mapping_search_apps),
                             modifier = Modifier.weight(1f),
                         )
                         // 映射的目标不必来自列表：图标包里可能有本机没装的应用，
                         // 也可以手动把一个包名指到自己想要的图标上
-                        TextButton(onClick = { targetDraft = TargetDraft("", null) }) {
-                            Text(stringResource(R.string.mapping_add_target))
-                        }
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.xs),
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    ) {
-                        FilterChip(
-                            selected = state.onlyUnmapped,
-                            onClick = { viewModel.setOnlyUnmapped(!state.onlyUnmapped) },
-                            label = { Text(stringResource(R.string.mapping_only_unmapped)) },
-                        )
-                        if (state.onlyUnmapped && state.visibleApps.isEmpty()) {
-                            Text(
-                                text = stringResource(R.string.mapping_all_mapped_done),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.align(Alignment.CenterVertically),
+                        IconButton(onClick = { targetDraft = TargetDraft("", null) }) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = stringResource(R.string.mapping_add_target),
+                                tint = MaterialTheme.colorScheme.primary,
                             )
                         }
                     }
-                    if (state.loading) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
-                    } else {
-                        LazyColumn(
+                    when {
+                        state.loading -> Box(
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
-                            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                            contentAlignment = Alignment.Center,
+                        ) { CircularProgressIndicator() }
+
+                        // 筛选后没有结果时，空态要区分"真的没有"和"被筛掉了"，
+                        // 否则用户看到"没有匹配的应用"会以为列表坏了
+                        state.visibleApps.isEmpty() -> EmptyState(
+                            title = if (state.onlyUnmapped && state.apps.isNotEmpty()) {
+                                stringResource(R.string.mapping_apps_all_mapped_title)
+                            } else {
+                                stringResource(R.string.mapping_apps_empty)
+                            },
+                            body = if (state.onlyUnmapped && state.apps.isNotEmpty()) {
+                                stringResource(R.string.mapping_all_mapped_done)
+                            } else {
+                                null
+                            },
+                            icon = Icons.Default.Search,
+                        )
+
+                        // 应用列表改为"裸行 + 分隔线"：几十行各套一张灰卡会让整屏失去呼吸，
+                        // 这里的信息结构是单维的（应用 → 图标），行比卡片更合适
+                        else -> LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(
+                                start = Layout.pageHorizontal,
+                                end = Layout.pageHorizontal,
+                                bottom = Spacing.xl,
+                            ),
                         ) {
-                            items(state.visibleApps, key = { it.component }) { app ->
+                            itemsIndexed(state.visibleApps, key = { _, app -> app.component }) { index, app ->
                                 AppRowItem(
                                     app = app,
                                     icons = state.icons,
                                     onClick = { pickingApp = AssignTarget(app.component, null) },
                                     onEditTarget = { targetDraft = TargetDraft(app.packageName, app) },
                                 )
+                                if (index != state.visibleApps.lastIndex) {
+                                    AppDivider(startIndent = IconSize.appRow + Spacing.md)
+                                }
                             }
                         }
                     }
@@ -276,29 +410,45 @@ fun MappingScreen(
 
                 else -> Column(modifier = Modifier.fillMaxSize()) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.xs),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Layout.pageHorizontal, vertical = Spacing.xs),
                         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
+                            // 这里只报总数；筛选后的数量由顶栏副标题给（「只看未使用 · N 个图标」），
+                            // 两个数分处两地但含义不同，不在同一行重复一遍
                             text = stringResource(R.string.mapping_icon_count, state.icons.size),
                             style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         OutlinedButton(
                             onClick = { showShapeBatch = true },
+                            // 统一外形作用于整库，不受筛选影响，故按总数判断可用性
                             enabled = state.icons.isNotEmpty() && !state.importing,
                         ) { Text(stringResource(R.string.mapping_unify_shape)) }
                     }
-                    if (state.icons.isEmpty() && !state.importing) {
-                        // 空状态引导：新项目最容易在"导入"这一步停顿——把两条导入通道
-                        // 的入口明示在库面板里（顶部 chips 本就有，这里只是再指一次路）
-                        EmptyState(
-                            message = stringResource(R.string.mapping_icons_empty),
+                    when {
+                        state.icons.isEmpty() && !state.importing -> {
+                            // 空状态引导：新项目最容易在"导入"这一步停顿——把两条导入通道
+                            // 的入口明示在库面板里（顶部卡片本就有，这里只是再指一次路）
+                            EmptyState(
+                                title = stringResource(R.string.mapping_icons_empty_title),
+                                body = stringResource(R.string.mapping_icons_empty),
+                                icon = Icons.Default.Add,
+                            )
+                        }
+
+                        state.visibleIcons.isEmpty() -> EmptyState(
+                            title = stringResource(R.string.mapping_icons_all_used_title),
+                            body = stringResource(R.string.mapping_icons_all_used_body),
+                            icon = Icons.Default.Check,
                         )
-                    } else {
-                        IconLibraryTab(
-                            icons = state.icons,
+
+                        else -> IconLibraryTab(
+                            icons = state.visibleIcons,
                             iconTargets = state.iconTargets,
                             onIconClick = { detailIcon = it },
                         )
@@ -309,12 +459,23 @@ fun MappingScreen(
     }
 
     pickingApp?.let { target ->
+        val assignedSlot = state.apps.firstOrNull { it.component == target.component }?.assignedSlot
         IconPickerDialog(
             icons = state.icons,
             targetPackage = MappingTarget.packageOf(target.component),
+            assignedSlot = assignedSlot,
             onSelect = { slot ->
                 viewModel.assign(target.component, slot, target.from)
                 pickingApp = null
+            },
+            // 指派错了要能退回"未映射"，否则只能再挑一张把错的盖掉
+            onClear = if (assignedSlot != null) {
+                {
+                    viewModel.unassign(target.component)
+                    pickingApp = null
+                }
+            } else {
+                null
             },
             onDismiss = { pickingApp = null },
         )
@@ -390,68 +551,73 @@ private fun AppRowItem(
 ) {
     val assignedIcon = icons.firstOrNull { it.slot == app.assignedSlot }
 
-    Card(onClick = onClick) {
-        Row(
-            modifier = Modifier.padding(Spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            AppIconThumb(packageName = app.packageName)
-            Spacer(modifier = Modifier.size(Spacing.md))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = app.label,
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                )
-                // 包名可点即改：已映射的行才提供入口——没有映射时"改包名"无从谈起，
-                // 那种情况该走上面的「添加映射」
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = if (app.assignedSlot != null) {
-                        Modifier.clickable(onClick = onEditTarget)
-                            .padding(vertical = Spacing.xs, horizontal = Spacing.xs)
-                    } else {
-                        Modifier
-                    },
-                ) {
-                    Text(
-                        text = app.packageName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (app.assignedSlot != null) {
-                        Spacer(modifier = Modifier.size(Spacing.xs))
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = stringResource(R.string.cd_edit_target),
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            // 已指派图标预览；未映射时以文字占位，保持行高稳定
-            Box(
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .heightIn(min = 64.dp)
+            .padding(vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AppIconThumb(packageName = app.packageName)
+        Spacer(modifier = Modifier.size(Spacing.md))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = app.label,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            // 包名可点即改：整行 36dp 高的热区，比一个 14dp 的铅笔图标可靠得多；
+            // 只有已映射的行才提供入口——没有映射时"改包名"无从谈起
+            Row(
                 modifier = Modifier
-                    .size(IconSize.row)
-                    .clip(MaterialTheme.shapes.small),
-                contentAlignment = Alignment.Center,
+                    .heightIn(min = 36.dp)
+                    .then(
+                        if (app.assignedSlot != null) {
+                            Modifier.clickable(onClick = onEditTarget)
+                        } else {
+                            Modifier
+                        },
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (assignedIcon != null) {
-                    IconImage(
-                        path = assignedIcon.editedPath ?: assignedIcon.sourcePath,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
-                    )
-                } else {
-                    Text(
-                        text = stringResource(R.string.mapping_app_unmapped),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Text(
+                    text = app.packageName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (app.assignedSlot != null) {
+                    Spacer(modifier = Modifier.size(Spacing.xs))
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = stringResource(R.string.cd_edit_target),
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
+        }
+        Spacer(modifier = Modifier.size(Spacing.sm))
+        // 右侧固定槽位：有图标放图标，无图标放状态徽标。两者都居中对齐，
+        // 于是整列的右边界是一条直线，滚动时不会左右跳
+        if (assignedIcon != null) {
+            ThumbnailBox(size = IconSize.appRow, shape = MaterialTheme.shapes.small) {
+                IconImage(
+                    path = assignedIcon.editedPath ?: assignedIcon.sourcePath,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+        } else {
+            StatusBadge(
+                text = stringResource(R.string.mapping_app_unmapped),
+                tone = Tone.Neutral,
+            )
         }
     }
 }
@@ -467,12 +633,7 @@ private fun AppIconThumb(packageName: String) {
             runCatching { appInfoProvider.loadAppIcon(packageName)?.toImageBitmap() }.getOrNull()
         }
     }
-    Box(
-        modifier = Modifier
-            .size(IconSize.row)
-            .clip(MaterialTheme.shapes.small),
-        contentAlignment = Alignment.Center,
-    ) {
+    ThumbnailBox(size = IconSize.appRow, shape = MaterialTheme.shapes.small) {
         val bitmap: ImageBitmap? = appIcon
         if (bitmap != null) {
             Image(
@@ -481,6 +642,210 @@ private fun AppIconThumb(packageName: String) {
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit,
             )
+        }
+    }
+}
+
+/**
+ * 圆形进度环：把"已映射 3 / 36"从一句文字变成一个可一眼估量的图形。
+ *
+ * 环内只放百分比（两位数字），标签由上方卡片标题承担——
+ * 44dp 的环里塞"3/36"会让字号缩到 9sp 以下。
+ */
+@Composable
+private fun ProgressRing(progress: Float, modifier: Modifier = Modifier) {
+    val target = progress.coerceIn(0f, 1f)
+    val palette = LocalAppPalette.current
+    val primary = MaterialTheme.colorScheme.primary
+    val animated by animateFloatAsState(
+        targetValue = target,
+        animationSpec = tween(Motion.NORMAL),
+        label = "mapping-progress",
+    )
+    Box(modifier = modifier.size(44.dp), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val stroke = 4.dp.toPx()
+            val inset = stroke / 2
+            val arcSize = Size(size.width - stroke, size.height - stroke)
+            drawArc(
+                color = palette.divider,
+                startAngle = -90f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = Offset(inset, inset),
+                size = arcSize,
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
+            )
+            drawArc(
+                color = primary,
+                startAngle = -90f,
+                sweepAngle = 360f * animated,
+                useCenter = false,
+                topLeft = Offset(inset, inset),
+                size = arcSize,
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
+            )
+        }
+        Text(
+            text = "${(target * 100).roundToInt()}%",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * 可收起的头部容器。
+ *
+ * 子项按自身完整高度测量（不受"当前可见高度"影响），再只把可见高度报给父布局，
+ * 内容以底边对齐向上移出——观感是整块被顶栏吃掉，而不是从下往上被裁掉半张卡。
+ */
+@Composable
+private fun CollapsingHeader(
+    collapsedPx: Float,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Layout(content = content, modifier = modifier) { measurables, constraints ->
+        val placeable = measurables.first().measure(
+            constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity),
+        )
+        val visible = (placeable.height - collapsedPx).roundToInt().coerceIn(0, placeable.height)
+        layout(placeable.width, visible) {
+            placeable.place(0, visible - placeable.height)
+        }
+    }
+}
+
+/**
+ * 进度头卡：环形进度与三个数字同排，导入入口在下一行。
+ *
+ * 旧版是"标题 + 环 / 指标条 / 导入"三行、166dp，占掉屏幕近 1/5，
+ * 而它承载的信息只有三个数字和两个入口。合成两行后约 112dp；
+ * 往上一滑还能整块收起（见 [CollapsingHeader]），列表因此能拿到全部高度。
+ */
+@Composable
+private fun MappingHeaderCard(
+    appsCount: Int,
+    mappedCount: Int,
+    iconsCount: Int,
+    importing: Boolean,
+    onImportAlbum: () -> Unit,
+    onImportZip: () -> Unit,
+    onHeightMeasured: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SectionCard(
+        // 先量后加边距：收起时把卡片上下的 8dp 一起带走，不留一道白缝
+        modifier = modifier
+            .onSizeChanged { onHeightMeasured(it.height) }
+            .padding(horizontal = Layout.pageHorizontal, vertical = Spacing.sm),
+        contentPadding = PaddingValues(horizontal = Layout.cardPadding, vertical = Spacing.md),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ProgressRing(
+                progress = if (appsCount == 0) 0f else mappedCount.toFloat() / appsCount,
+            )
+            Spacer(modifier = Modifier.size(Spacing.md))
+            MetricStrip(
+                items = listOf(
+                    MetricItem(stringResource(R.string.mapping_metric_apps), appsCount.toString()),
+                    MetricItem(stringResource(R.string.mapping_metric_mapped), mappedCount.toString()),
+                    MetricItem(stringResource(R.string.mapping_metric_icons), iconsCount.toString()),
+                ),
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Spacer(modifier = Modifier.size(Spacing.md))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AssistChip(
+                onClick = onImportAlbum,
+                label = { Text(stringResource(R.string.mapping_import_album)) },
+            )
+            AssistChip(
+                onClick = onImportZip,
+                label = { Text(stringResource(R.string.mapping_import_zip)) },
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            if (importing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(IconSize.progressSmall),
+                    strokeWidth = 2.dp,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 轻量搜索框：44dp 高、胶囊底、无外框。
+ *
+ * 旧版用 OutlinedTextField：浮动标签让控件高 56dp 且视觉重量与"标题"相当，
+ * 在工具型页面里它不该比内容更抢眼。
+ */
+@Composable
+private fun SearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+) {
+    val palette = LocalAppPalette.current
+    Row(
+        modifier = modifier
+            .height(44.dp)
+            .clip(CircleShape)
+            // 页面底色与 cardMuted 几乎同色，只填色等于没有边界——补一圈发丝描边
+            .background(palette.card)
+            .border(Layout.hairline, palette.divider, CircleShape)
+            .padding(horizontal = Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Default.Search,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(IconSize.inline),
+        )
+        Spacer(modifier = Modifier.size(Spacing.sm))
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            modifier = Modifier.weight(1f),
+            decorationBox = { innerTextField ->
+                Box(contentAlignment = Alignment.CenterStart) {
+                    if (value.isEmpty()) {
+                        Text(
+                            text = placeholder,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    innerTextField()
+                }
+            },
+        )
+        if (value.isNotEmpty()) {
+            IconButton(
+                onClick = { onValueChange("") },
+                modifier = Modifier.size(32.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Clear,
+                    contentDescription = stringResource(R.string.common_clear),
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -680,9 +1045,12 @@ private fun InstalledAppPickerDialog(
 private fun IconPickerDialog(
     icons: List<IconAssetEntity>,
     targetPackage: String,
+    assignedSlot: Int?,
     onSelect: (Int) -> Unit,
+    onClear: (() -> Unit)?,
     onDismiss: () -> Unit,
 ) {
+    val palette = LocalAppPalette.current
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -701,29 +1069,70 @@ private fun IconPickerDialog(
                 Text(stringResource(R.string.mapping_icons_pool_empty))
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(88.dp),
+                    // 固定 3 列：自适应列数会随对话框宽度与字号在 3/4 列之间抖动，
+                    // 3 列时每格约 96dp、图标 72dp，一眼数得清、点击目标也够大
+                    columns = GridCells.Fixed(3),
                     modifier = Modifier.height(dialogListHeight()),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     items(icons.size, key = { index -> icons[index].id }) { index ->
                         val icon = icons[index]
-                        // 单元格整体居中：条目不再贴左，网格观感均匀
+                        // 当前已映射的那一格加主色描边 + 角标：误选之后要先看清"现在挂的是哪张"
+                        val current = assignedSlot != null && icon.slot == assignedSlot
                         Box(
                             modifier = Modifier
-                                .fillMaxSize()
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .clip(MaterialTheme.shapes.medium)
+                                .background(palette.cardMuted)
+                                // 浅色下 cardMuted 与对话框面色几乎一致，补一圈发丝边才看得出格子边界
+                                .border(
+                                    if (current) 2.dp else Layout.hairline,
+                                    if (current) MaterialTheme.colorScheme.primary else palette.divider,
+                                    MaterialTheme.shapes.medium,
+                                )
                                 .clickable { onSelect(icon.slot) },
                             contentAlignment = Alignment.Center,
                         ) {
                             IconImage(
                                 path = icon.editedPath ?: icon.sourcePath,
                                 contentDescription = icon.originalName,
-                                modifier = Modifier
-                                    .padding(Spacing.xs)
-                                    .size(64.dp),
+                                modifier = Modifier.fillMaxSize().padding(Spacing.md),
                             )
+                            if (current) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(Spacing.xs)
+                                        .size(18.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = stringResource(
+                                            R.string.mapping_pick_icon_current,
+                                        ),
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(12.dp),
+                                    )
+                                }
+                            }
                         }
                     }
+                }
+            }
+        },
+        // 左右分置：清除映射是"退出这条映射"，与"取消"不同，给它独立的位置与错误色
+        dismissButton = onClear?.let {
+            {
+                TextButton(onClick = it) {
+                    Text(
+                        text = stringResource(R.string.mapping_clear_assignment),
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
             }
         },

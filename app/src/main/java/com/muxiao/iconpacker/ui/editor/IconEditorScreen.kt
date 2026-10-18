@@ -1,5 +1,6 @@
 package com.muxiao.iconpacker.ui.editor
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -10,25 +11,26 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,6 +41,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
@@ -46,6 +50,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -55,13 +60,16 @@ import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.core.packer.engine.CropSpec
 import com.muxiao.iconpacker.core.packer.engine.IconShape
 import com.muxiao.iconpacker.core.packer.engine.IconStyle
+import com.muxiao.iconpacker.ui.components.AppChip
 import com.muxiao.iconpacker.ui.components.AppScaffold
 import com.muxiao.iconpacker.ui.components.ColorSwatch
 import com.muxiao.iconpacker.ui.components.ColorSwatchRow
-import com.muxiao.iconpacker.ui.components.SectionHeader
+import com.muxiao.iconpacker.ui.components.SectionCard
 import com.muxiao.iconpacker.ui.components.asString
 import com.muxiao.iconpacker.ui.components.colorSwatchLabelRes
 import com.muxiao.iconpacker.ui.components.iconShapeLabel
+import com.muxiao.iconpacker.ui.theme.Layout
+import com.muxiao.iconpacker.ui.theme.LocalAppPalette
 import com.muxiao.iconpacker.ui.theme.Spacing
 import java.util.Locale
 import kotlin.math.min
@@ -83,14 +91,21 @@ private const val DEFAULT_BORDER_WIDTH = 0.04f
  */
 @Composable
 fun IconEditorScreen(
-    packId: Long,
-    slot: Int,
+    target: IconEditorTarget,
     onBack: () -> Unit,
-    viewModel: IconEditorViewModel = viewModel(factory = IconEditorViewModel.factory(packId, slot)),
+    /** 保存成功后的回调（在 [onBack] 之前触发）；用于把结果带回调用方 */
+    onSaved: (() -> Unit)? = null,
+    /** 覆盖顶栏标题；为空则用图标自身的名称 */
+    titleOverride: String? = null,
+    viewModel: IconEditorViewModel = viewModel(factory = IconEditorViewModel.factory(target)),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // 系统返回键与顶栏返回同义。图标包图标是在表单之上以浮层方式编辑的，
+    // 不接管返回键就会把整个页面退掉（连带丢掉用户填了一半的表单）
+    BackHandler(onBack = onBack)
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -99,11 +114,14 @@ fun IconEditorScreen(
         }
     }
     LaunchedEffect(state.finished) {
-        if (state.finished) onBack()
+        if (state.finished) {
+            onSaved?.invoke()
+            onBack()
+        }
     }
 
     AppScaffold(
-        title = state.iconName.ifBlank { stringResource(R.string.editor_title) },
+        title = titleOverride ?: state.iconName.ifBlank { stringResource(R.string.editor_title) },
         onBack = onBack,
         snackbarHostState = snackbarHostState,
         bottomBar = { if (!state.loading) EditorBottomBar(state, viewModel) },
@@ -137,150 +155,188 @@ private fun EditorBody(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            .padding(horizontal = Layout.pageHorizontal, vertical = Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Layout.cardGap),
     ) {
         // ---- 结果预览（与打包同路径合成，所见即所得）----
-        PreviewPanel(preview = state.preview, modifier = Modifier)
+        SectionCard(contentPadding = PaddingValues(Spacing.md)) {
+            PreviewPanel(preview = state.preview)
+            Spacer(modifier = Modifier.size(Spacing.sm))
+            Text(
+                text = stringResource(R.string.editor_preview_hint),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
 
         // ---- 裁剪 ----
-        SectionHeader(stringResource(R.string.editor_section_crop))
-        Text(
-            text = stringResource(R.string.editor_crop_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        val source = state.source
-        if (source != null) {
-            CropSurface(
-                source = source,
-                crop = style.crop,
-                onCropChange = { viewModel.updateStyle(style.copy(crop = it)) },
-                modifier = Modifier.align(Alignment.CenterHorizontally),
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = stringResource(
-                        R.string.editor_zoom_label,
-                        // 固定 US 小数点格式：本地化范围仅 zh/en，且这是缩放倍率的数值标注
-                        String.format(Locale.US, "%.1f", style.crop.zoom),
-                    ),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+        SectionCard(
+            title = stringResource(R.string.editor_section_crop),
+            description = stringResource(R.string.editor_crop_hint),
+        ) {
+            val source = state.source
+            if (source != null) {
+                CropSurface(
+                    source = source,
+                    crop = style.crop,
+                    onCropChange = { viewModel.updateStyle(style.copy(crop = it)) },
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
-                Spacer(modifier = Modifier.weight(1f))
-                OutlinedButton(
-                    onClick = { viewModel.updateStyle(style.copy(crop = CropSpec.DEFAULT)) },
-                    enabled = !style.crop.isDefault,
-                ) { Text(stringResource(R.string.editor_crop_reset)) }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(
+                            R.string.editor_zoom_label,
+                            // 固定 US 小数点格式：本地化范围仅 zh/en，且这是缩放倍率的数值标注
+                            String.format(Locale.US, "%.1f", style.crop.zoom),
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    TextButton(
+                        onClick = { viewModel.updateStyle(style.copy(crop = CropSpec.DEFAULT)) },
+                        enabled = !style.crop.isDefault,
+                    ) { Text(stringResource(R.string.editor_crop_reset)) }
+                }
+            } else {
+                Text(
+                    text = stringResource(R.string.editor_source_loading),
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
-        } else {
-            Text(stringResource(R.string.editor_source_loading), style = MaterialTheme.typography.bodySmall)
         }
 
         // ---- 外形（独立裁剪蒙版，不依赖背景色）----
-        SectionHeader(stringResource(R.string.shape_batch_shape))
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            IconShape.entries.forEach { shape ->
-                FilterChip(
-                    selected = style.shape == shape,
-                    onClick = { viewModel.updateStyle(style.copy(shape = shape)) },
-                    label = { Text(shape.iconShapeLabel()) },
-                )
+        SectionCard(title = stringResource(R.string.shape_batch_shape)) {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                IconShape.entries.forEach { shape ->
+                    AppChip(
+                        selected = style.shape == shape,
+                        label = shape.iconShapeLabel(),
+                        onClick = { viewModel.updateStyle(style.copy(shape = shape)) },
+                    )
+                }
             }
         }
 
         // ---- 背景色（默认关闭：不开就不画底板，不会出现"多余的边框"）----
-        SwitchRow(
+        SectionCard(
             title = stringResource(R.string.shape_batch_bg),
-            subtitle = if (style.hasBackground) {
+            description = if (style.hasBackground) {
                 stringResource(R.string.editor_background_on)
             } else {
                 stringResource(R.string.editor_background_off)
             },
-            checked = style.hasBackground,
-            onCheckedChange = { on ->
-                val color = if (on) {
-                    IconStyle.PRESET_COLORS.first { it.first != android.graphics.Color.TRANSPARENT }.first
-                } else {
-                    android.graphics.Color.TRANSPARENT
-                }
-                viewModel.updateStyle(
-                    style.copy(
-                        backgroundColor = color,
-                        // 铺满状态下补上底板会把内容顶到边缘，自动收到安全区
-                        contentScale = if (on && style.contentScale >= 0.999f) {
-                            IconStyle.SAFE_SCALE
+            trailing = {
+                Switch(
+                    checked = style.hasBackground,
+                    onCheckedChange = { on ->
+                        val color = if (on) {
+                            IconStyle.PRESET_COLORS
+                                .first { it.first != android.graphics.Color.TRANSPARENT }.first
                         } else {
-                            style.contentScale
-                        },
-                    ),
+                            android.graphics.Color.TRANSPARENT
+                        }
+                        viewModel.updateStyle(
+                            style.copy(
+                                backgroundColor = color,
+                                // 铺满状态下补上底板会把内容顶到边缘，自动收到安全区
+                                contentScale = if (on && style.contentScale >= 0.999f) {
+                                    IconStyle.SAFE_SCALE
+                                } else {
+                                    style.contentScale
+                                },
+                            ),
+                        )
+                    },
                 )
             },
-        )
-        if (style.hasBackground) {
-            ColorSwatchRow(
-                entries = IconStyle.PRESET_COLORS.map { (preset, _) ->
-                    ColorSwatch(preset, stringResource(colorSwatchLabelRes(preset)))
-                },
-                selected = style.backgroundColor,
-                onSelect = { viewModel.updateStyle(style.copy(backgroundColor = it)) },
-            )
+        ) {
+            if (style.hasBackground) {
+                ColorSwatchRow(
+                    entries = IconStyle.PRESET_COLORS.map { (preset, _) ->
+                        ColorSwatch(preset, stringResource(colorSwatchLabelRes(preset)))
+                    },
+                    selected = style.backgroundColor,
+                    onSelect = { viewModel.updateStyle(style.copy(backgroundColor = it)) },
+                )
+            }
         }
 
         // ---- 边框（默认关闭）----
-        SwitchRow(
-            title = stringResource(R.string.editor_border_title),
-            subtitle = if (style.hasBorder) {
+        SectionCard(
+            title = stringResource(R.string.editor_group_border),
+            description = if (style.hasBorder) {
                 stringResource(R.string.editor_border_on)
             } else {
                 stringResource(R.string.editor_border_off)
             },
-            checked = style.hasBorder,
-            onCheckedChange = { on ->
-                viewModel.updateStyle(
-                    style.copy(
-                        borderWidth = if (on) DEFAULT_BORDER_WIDTH else 0f,
-                        contentScale = if (on && style.contentScale >= 0.999f) {
-                            IconStyle.SAFE_SCALE
-                        } else {
-                            style.contentScale
-                        },
-                    ),
+            trailing = {
+                Switch(
+                    checked = style.hasBorder,
+                    onCheckedChange = { on ->
+                        viewModel.updateStyle(
+                            style.copy(
+                                borderWidth = if (on) DEFAULT_BORDER_WIDTH else 0f,
+                                contentScale = if (on && style.contentScale >= 0.999f) {
+                                    IconStyle.SAFE_SCALE
+                                } else {
+                                    style.contentScale
+                                },
+                            ),
+                        )
+                    },
                 )
             },
-        )
-        if (style.hasBorder) {
-            Text(
-                text = stringResource(R.string.editor_border_width, (style.borderWidth * 100).roundToInt()),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Slider(
-                value = style.borderWidth,
-                onValueChange = { viewModel.updateStyle(style.copy(borderWidth = it)) },
-                valueRange = 0.01f..0.12f,
-            )
-            Text(stringResource(R.string.editor_border_color), style = MaterialTheme.typography.labelMedium)
-            ColorSwatchRow(
-                entries = IconStyle.PRESET_BORDER_COLORS.map { (preset, _) ->
-                    ColorSwatch(preset, stringResource(colorSwatchLabelRes(preset)))
-                },
-                selected = style.borderColor,
-                onSelect = { viewModel.updateStyle(style.copy(borderColor = it)) },
-            )
+        ) {
+            if (style.hasBorder) {
+                Text(
+                    text = stringResource(R.string.editor_border_width, (style.borderWidth * 100).roundToInt()),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Slider(
+                    value = style.borderWidth,
+                    onValueChange = { viewModel.updateStyle(style.copy(borderWidth = it)) },
+                    valueRange = 0.01f..0.12f,
+                )
+                Spacer(modifier = Modifier.size(Spacing.xs))
+                Text(
+                    text = stringResource(R.string.editor_border_color),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                ColorSwatchRow(
+                    entries = IconStyle.PRESET_BORDER_COLORS.map { (preset, _) ->
+                        ColorSwatch(preset, stringResource(colorSwatchLabelRes(preset)))
+                    },
+                    selected = style.borderColor,
+                    onSelect = { viewModel.updateStyle(style.copy(borderColor = it)) },
+                )
+            }
         }
 
-        // ---- 内容缩放 ----
-        SectionHeader(
-            stringResource(R.string.editor_scale_label, (style.contentScale * 100).roundToInt()) +
-                if (style.contentScale >= 0.999f) stringResource(R.string.editor_scale_fill) else "",
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        // ---- 内容缩放：百分比放在卡片尾部，滑杆独占一行，数值与滑块不抢位置 ----
+        SectionCard(
+            title = stringResource(R.string.editor_group_scale),
+            trailing = {
+                Text(
+                    text = "${(style.contentScale * 100).roundToInt()}%" +
+                        if (style.contentScale >= 0.999f) stringResource(R.string.editor_scale_fill) else "",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            },
+        ) {
             Slider(
                 value = style.contentScale,
                 onValueChange = { viewModel.updateStyle(style.copy(contentScale = it)) },
@@ -300,84 +356,115 @@ private fun EditorBody(
                 text = stringResource(R.string.editor_overwrite_warn),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Spacing.xs),
             )
         }
+        Spacer(modifier = Modifier.size(Spacing.sm))
     }
 }
 
-/** 预览面板：固定高度上限内水平居中，预览图不随内容长度跳动 */
+/**
+ * 预览面板：棋盘格底 + 居中方形预览。
+ *
+ * 棋盘格是"透明"的通用语汇——图标本身可能带透明通道，用纯色底会让人
+ * 误以为成品有一块灰底板。容器 148dp、预览框 116dp、图内再留 8dp，
+ * 三层递减保证预览既醒目又不会顶满卡片（首屏要给裁剪留出空间）。
+ */
 @Composable
 private fun PreviewPanel(preview: ImageBitmap?, modifier: Modifier = Modifier) {
+    val palette = LocalAppPalette.current
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(180.dp)
+            .height(148.dp)
             .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(palette.cardMuted),
         contentAlignment = Alignment.Center,
     ) {
-        if (preview != null) {
-            Image(
-                bitmap = preview,
-                contentDescription = stringResource(R.string.cd_editor_preview),
-                modifier = Modifier.size(152.dp),
-                contentScale = ContentScale.Fit,
-            )
-        } else {
-            Text(stringResource(R.string.editor_preview_failed), style = MaterialTheme.typography.bodySmall)
+        Box(
+            modifier = Modifier
+                .size(116.dp)
+                .clip(MaterialTheme.shapes.small),
+            contentAlignment = Alignment.Center,
+        ) {
+            Checkerboard(modifier = Modifier.fillMaxSize())
+            if (preview != null) {
+                Image(
+                    bitmap = preview,
+                    contentDescription = stringResource(R.string.cd_editor_preview),
+                    modifier = Modifier.fillMaxSize().padding(Spacing.sm),
+                    contentScale = ContentScale.Fit,
+                )
+            } else {
+                Text(
+                    text = stringResource(R.string.editor_preview_failed),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
 
-/** 底部操作条：主操作"保存"常驻，有编辑历史时并列"还原为原图" */
+/** 透明底棋盘格：10dp 方格，用卡片色与次级容器色交替，明暗两套主题下都保持低对比 */
+@Composable
+private fun Checkerboard(modifier: Modifier = Modifier) {
+    val palette = LocalAppPalette.current
+    Canvas(modifier = modifier) {
+        val cell = 10.dp.toPx()
+        var row = 0
+        var y = 0f
+        while (y < size.height) {
+            var col = 0
+            var x = 0f
+            while (x < size.width) {
+                drawRect(
+                    color = if ((row + col) % 2 == 0) palette.card else palette.cardMuted,
+                    topLeft = Offset(x, y),
+                    size = Size(minOf(cell, size.width - x), minOf(cell, size.height - y)),
+                )
+                x += cell
+                col++
+            }
+            y += cell
+            row++
+        }
+    }
+}
+
+/**
+ * 底部操作条：主操作"保存"常驻，有编辑历史时并列"还原为原图"。
+ *
+ * 两者同一行、同一高度（48dp）：旧版上下两行各自铺满，两个按钮等宽等高，
+ * 用户要读完整行文字才知道哪个是主操作。现在主按钮占更大权重，副按钮描边。
+ */
 @Composable
 private fun EditorBottomBar(
     state: IconEditorUiState,
     viewModel: IconEditorViewModel,
 ) {
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            .padding(horizontal = Layout.pageHorizontal, vertical = Spacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         if (state.hasEdit) {
             OutlinedButton(
                 onClick = viewModel::reset,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f).heightIn(min = Layout.touchTarget),
             ) { Text(stringResource(R.string.editor_restore)) }
         }
         Button(
             onClick = viewModel::save,
             enabled = !state.saving,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .weight(if (state.hasEdit) 1.2f else 1f)
+                .heightIn(min = Layout.touchTarget),
         ) {
             Text(if (state.saving) stringResource(R.string.editor_saving) else stringResource(R.string.common_save))
         }
-    }
-}
-
-@Composable
-private fun SwitchRow(
-    title: String,
-    subtitle: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleSmall)
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Spacer(modifier = Modifier.width(Spacing.md))
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -385,7 +472,8 @@ private fun SwitchRow(
  * 交互式裁剪视图：正方形取景框，源图在其下方平移缩放。
  *
  * 整个视口就是裁切区——所见即所得，不需要额外的框选矩形。
- * 视口宽度取可用宽度的 85%（aspectRatio 锁正方形），不再写死 240dp。
+ * 视口宽度取卡片内容宽度的 72%（aspectRatio 锁正方形）：既够手指拖拽，
+ * 也不至于把整张卡片撑到一屏只放得下它一个。
  * 手势回调里必须读到最新的 crop / 回调，但 pointerInput 的 key 不能带上 crop，
  * 否则每帧重组都会重启手势检测器，拖动会断。
  */
@@ -412,7 +500,7 @@ private fun CropSurface(
 
     BoxWithConstraints(
         modifier = modifier
-            .fillMaxWidth(0.85f)
+            .fillMaxWidth(0.72f)
             .aspectRatio(1f),
     ) {
         val viewportPx = with(LocalDensity.current) { maxWidth.toPx() }
