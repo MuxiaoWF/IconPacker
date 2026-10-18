@@ -32,6 +32,8 @@
     <string name="settings_section_defaults">新建项目默认值</string>
     <string name="settings_default_version_name">默认版本名</string>
     <string name="settings_default_version_name_hint">留空则用内置默认（1.0）</string>
+    <string name="settings_keep_artifacts">产物保留版本数</string>
+    <string name="settings_keep_artifacts_desc">打包成功后只保留最近几份产物 APK，更早的自动清理；已安装的应用不受影响，项目数据也原样保留。</string>
     <string name="settings_default_signer_name">默认签名者名</string>
     <string name="settings_default_signer_name_hint">v1 签名条目使用的文件名；留空则用内置默认</string>
     <string name="settings_default_schemes">默认签名方案</string>
@@ -109,6 +111,25 @@
     <string name="packlist_install_not_installed">未安装</string>
     <string name="packlist_install_latest">已是最新</string>
     <string name="packlist_install_update">可更新（已装 v%1$d → v%2$d）</string>
+    <string name="packlist_search_hint">搜索项目名或包名</string>
+    <string name="packlist_overview">共 %1$d 个项目 · 已安装 %2$d 个 · 占用 %3$s</string>
+    <string name="packlist_sort">排序</string>
+    <string name="packlist_sort_recent">最近修改</string>
+    <string name="packlist_sort_name">名称</string>
+    <string name="packlist_sort_installed">已安装优先</string>
+    <string name="packlist_select">批量选择</string>
+    <string name="packlist_select_done">退出多选</string>
+    <string name="packlist_selected_count">已选 %1$d 项</string>
+    <string name="packlist_select_all">全选</string>
+    <string name="packlist_no_match">没有匹配的项目</string>
+    <string name="packlist_bulk_install">安装 / 重装</string>
+    <string name="packlist_bulk_uninstall">卸载</string>
+    <string name="msg_bulk_install_none">所选项目没有可安装的产物，请先打包</string>
+    <string name="msg_bulk_uninstall_none">所选项目当前都未安装</string>
+    <string name="uninstall_hint_title">卸载图标包？</string>
+    <string name="uninstall_hint_body">卸载后桌面图标会回落为系统默认，桌面布局不受影响。项目数据与已生成的产物文件都会保留，随时可以重新安装。</string>
+    <string name="uninstall_hint_never">不再提示</string>
+    <string name="uninstall_hint_continue">继续卸载</string>
     <string name="cd_more">更多操作</string>
     <string name="cd_pack_icon">图标包图标</string>
     <string name="pack_icon_unset">未设</string>
@@ -389,7 +410,6 @@
     <string name="msg_build_no_launcher">未找到第三方启动器</string>
 
     <!-- ===== 版式重构（2026-10）：摘要、空态、指标标签 ===== -->
-    <string name="packlist_count">共 %1$d 个图标包</string>
     <string name="packlist_meta">%1$s（v%2$d）· %3$s</string>
     <string name="packlist_next_version_short">下次 v%1$d</string>
     <string name="packlist_empty_title">还没有图标包</string>

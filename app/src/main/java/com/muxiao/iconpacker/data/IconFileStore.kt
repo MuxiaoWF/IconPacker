@@ -5,6 +5,11 @@ import android.net.Uri
 import com.muxiao.iconpacker.core.packer.engine.ImportCompressor
 import com.muxiao.iconpacker.core.packer.engine.ZipIconPlanner
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -33,6 +38,11 @@ import java.util.zip.ZipInputStream
  * [extractZipImages]）。这三件事是"导入即建立映射"的前提——路径与 appfilter 都携带
  * 映射所需的信息，丢了就只能靠文件名猜。
  */
+/** 私有目录占用统计（字节） */
+data class StorageUsage(val iconsBytes: Long, val outputsBytes: Long) {
+    val totalBytes: Long get() = iconsBytes + outputsBytes
+}
+
 class IconFileStore(
     private val context: Context,
     private val importCompressor: ImportCompressor = ImportCompressor(),
@@ -81,10 +91,40 @@ class IconFileStore(
     suspend fun exportArtifact(source: File, target: Uri): Long =
         withContext(Dispatchers.IO) {
             context.contentResolver.openOutputStream(target)?.use { out ->
-                source.inputStream().use { input -> input.copyTo(out) }
+                source.inputStream().buffered(IO_BUFFER).use { input ->
+                    input.copyTo(out.buffered(IO_BUFFER), IO_BUFFER)
+                }
             } ?: error("无法打开导出目标")
             source.length()
         }
+
+    /**
+     * 只保留最近 [keep] 个版本的产物，删除更早的 `pack-v*.apk`；返回删除数量。
+     *
+     * 每打一次包就多一份产物，而重装/导出只需要最新那份：不裁剪的话，反复调整
+     * 图标的项目能把 `outputs/<id>/` 堆到几十 MB，用户在概览里看到的"占用"
+     * 也大得离谱。**删文件不等于卸载**——系统里已装的是它自己的拷贝，不受影响。
+     */
+    suspend fun pruneArtifacts(packId: Long, keep: Int = DEFAULT_KEEP_ARTIFACTS): Int =
+        withContext(Dispatchers.IO) {
+            val keepCount = keep.coerceAtLeast(1)
+            val artifacts = outputDir(packId)
+                .listFiles { file -> file.name.startsWith("pack-v") && file.name.endsWith(".apk") }
+                ?.sortedByDescending { versionCodeOfArtifact(it.name) }
+                ?: return@withContext 0
+            artifacts.drop(keepCount).count { it.delete() }
+        }
+
+    /** 私有目录占用（图标池 + 产物），供列表概览展示 */
+    suspend fun storageUsage(): StorageUsage = withContext(Dispatchers.IO) {
+        StorageUsage(
+            iconsBytes = dirSize(File(filesRoot, "icons")),
+            outputsBytes = dirSize(File(filesRoot, "outputs")),
+        )
+    }
+
+    private fun dirSize(dir: File): Long =
+        dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
 
     /**
      * 把照片选择器返回的 Uri 拷贝为私有文件，返回存储路径。
@@ -135,7 +175,9 @@ class IconFileStore(
                         entry.isDirectory -> Unit
                         isImageName(name) -> {
                             val target = File(dest, "zip__${seq}__${sanitizeName(name)}")
-                            target.outputStream().use { out -> zis.copyTo(out) }
+                            target.outputStream().buffered(IO_BUFFER).use { out ->
+                                zis.copyTo(out, IO_BUFFER)
+                            }
                             seq++
                             if (target.length() > MAX_IMAGE_BYTES) {
                                 target.delete()
@@ -161,7 +203,7 @@ class IconFileStore(
             )
             val plannedByPath = plan.kept.associateBy { it.path }
             val consumed = HashSet<String>()
-            val items = ArrayList<ZipImageItem>(plan.kept.size)
+            val toCompress = ArrayList<Pair<ZipIconPlanner.Planned, File>>(plan.kept.size)
             for (candidate in staged) {
                 val planned = plannedByPath[candidate.path]
                 // 未入选（多密度副本）或同路径重复出现：删除，不在私有目录留孤儿
@@ -169,13 +211,26 @@ class IconFileStore(
                     candidate.file.delete()
                     continue
                 }
-                val stored = importCompressor.compressInPlace(candidate.file)
-                items += ZipImageItem(
-                    file = stored,
-                    entryPath = planned.path,
-                    fileName = planned.fileName,
-                    matchKey = planned.matchKey,
-                )
+                toCompress += planned to candidate.file
+            }
+            // 解码 → 缩放 → 编码是纯 CPU 活：逐张串行的压缩阶段才是 ZIP 导入的大头，
+            // 这里按核数并行（上限 4，压住解码位图的内存峰值），awaitAll 保序回收
+            val parallelism = minOf(4, Runtime.getRuntime().availableProcessors().coerceAtLeast(2))
+            val gate = Semaphore(parallelism)
+            val items = coroutineScope {
+                toCompress.map { (planned, file) ->
+                    async(Dispatchers.Default) {
+                        gate.withPermit {
+                            val stored = importCompressor.compressInPlace(file)
+                            ZipImageItem(
+                                file = stored,
+                                entryPath = planned.path,
+                                fileName = planned.fileName,
+                                matchKey = planned.matchKey,
+                            )
+                        }
+                    }
+                }.awaitAll()
             }
             ZipExtraction(
                 items = items,
@@ -191,7 +246,9 @@ class IconFileStore(
         withContext(Dispatchers.IO) {
             val staged = File(iconsDir(packId), STAGED_ZIP_NAME)
             context.contentResolver.openInputStream(uri)?.use { input ->
-                staged.outputStream().use { out -> input.copyTo(out) }
+                staged.outputStream().buffered(IO_BUFFER).use { out ->
+                    input.copyTo(out, IO_BUFFER)
+                }
             } ?: error("无法读取 ZIP：$uri")
             extractZipImages(packId, staged).also { staged.delete() }
         }
@@ -376,6 +433,13 @@ class IconFileStore(
 
     companion object {
         const val TEMPLATE_ASSET = "template.apk"
+
+        /** 每个项目保留的产物版本数（更早的在打包成功后清掉） */
+        const val DEFAULT_KEEP_ARTIFACTS = 3
+
+        /** ZIP / 导出等大文件搬运的缓冲区：默认 8KB 在几百个条目时会明显拖慢 */
+        private const val IO_BUFFER = 64 * 1024
+
         private const val MAX_NAME_LEN = 64
 
         /**

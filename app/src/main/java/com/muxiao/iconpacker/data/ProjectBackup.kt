@@ -57,7 +57,7 @@ class ProjectBackup(
 
         var written = 0L
         context.contentResolver.openOutputStream(target)?.use { out ->
-            ZipOutputStream(out.buffered()).use { zip ->
+            ZipOutputStream(out.buffered(IO_BUFFER)).use { zip ->
                 val packJson = JSONObject()
                     .put("name", pack.name)
                     .put("versionCode", pack.versionCode)
@@ -112,7 +112,9 @@ class ProjectBackup(
 
                 pack.iconPath?.takeIf { File(it).isFile }?.let { path ->
                     zip.putNextEntry(ZipEntry("pack_icon.png"))
-                    File(path).inputStream().use { input -> input.copyTo(zip).also { written += it } }
+                    File(path).inputStream().buffered(IO_BUFFER).use { input ->
+                        input.copyTo(zip, IO_BUFFER).also { written += it }
+                    }
                     zip.closeEntry()
                 }
             }
@@ -123,7 +125,9 @@ class ProjectBackup(
     /** 写文件条目并返回条目名（JSON 里记录，导入按下表解包，避免路径重猜） */
     private fun ZipOutputStream.writeFileEntry(entryName: String, source: File): String {
         putNextEntry(ZipEntry(entryName))
-        val copied = source.inputStream().use { input -> input.copyTo(this) }
+        val copied = source.inputStream().buffered(IO_BUFFER).use { input ->
+            input.copyTo(this, IO_BUFFER)
+        }
         closeEntry()
         if (copied != source.length()) error("图标条目写出不完整：$entryName")
         return entryName
@@ -142,7 +146,9 @@ class ProjectBackup(
     suspend fun importProject(uri: Uri): Long = withContext(Dispatchers.IO) {
         val staged = File(context.cacheDir, "backup-import.zip")
         context.contentResolver.openInputStream(uri)?.use { input ->
-            staged.outputStream().use { output -> input.copyTo(output) }
+            staged.outputStream().buffered(IO_BUFFER).use { output ->
+                input.copyTo(output, IO_BUFFER)
+            }
         } ?: error("无法读取 ZIP：$uri")
         try {
             ZipFile(staged).use { zip ->
@@ -180,7 +186,10 @@ class ProjectBackup(
 
                 copyPackIcon(zip, newId, now)
 
+                // 逐条 insertAll 等于"每个图标一次事务"，300 张图标就是 300 次磁盘提交——
+                // 这是备份导入慢的另一半原因。先攒成一批，收尾各写一次。
                 val candidateIds = HashSet<Int>()
+                val assetRows = ArrayList<IconAssetEntity>(json.getJSONArray("assets").length())
                 json.getJSONArray("assets").forEach { raw ->
                     val assetJson = raw as JSONObject
                     val slot = assetJson.getInt("slot")
@@ -192,29 +201,29 @@ class ProjectBackup(
                         ?: error("备份缺少原图条目 $sourceEntry")
                     val editedPath = assetJson.optString("editedEntry", "")
                         .takeIf { it.isNotEmpty() }?.let { unzipTo(zip, it, slot, destSlotDir) }
-                    assetDao.insertAll(
-                        listOf(
-                            IconAssetEntity(
-                                packId = newId,
-                                slot = slot,
-                                sourcePath = sourcePath,
-                                originalName = assetJson.getString("originalName"),
-                                addedAt = now,
-                                editedPath = editedPath,
-                            ),
-                        ),
+                    assetRows += IconAssetEntity(
+                        packId = newId,
+                        slot = slot,
+                        sourcePath = sourcePath,
+                        originalName = assetJson.getString("originalName"),
+                        addedAt = now,
+                        editedPath = editedPath,
                     )
                     candidateIds.add(slot)
                 }
+                if (assetRows.isNotEmpty()) assetDao.insertAll(assetRows)
+
+                val mappingRows = ArrayList<MappingEntity>()
                 json.getJSONArray("mappings").forEach { raw ->
                     val mappingJson = raw as JSONObject
                     val slot = mappingJson.getInt("slot")
                     val component = mappingJson.getString("component")
                     // 映射指向落不进来的槽位：保留映射只会打包出灾难（缺图标中断），指向目标无效
                     if (slot in candidateIds) {
-                        mappingDao.insertAll(listOf(MappingEntity(packId = newId, component = component, slot = slot)))
+                        mappingRows += MappingEntity(packId = newId, component = component, slot = slot)
                     }
                 }
+                if (mappingRows.isNotEmpty()) mappingDao.insertAll(mappingRows)
                 newId
             }
         } finally {
@@ -225,7 +234,9 @@ class ProjectBackup(
     private suspend fun copyPackIcon(zip: ZipFile, newId: Long, now: Long) {
         val entry = zip.getEntry(PACK_ICON_ENTRY) ?: return
         val target = File(fileStore.iconsDir(newId), "pack_icon.png")
-        target.outputStream().use { output -> zip.getInputStream(entry).copyTo(output) }
+        target.outputStream().buffered(IO_BUFFER).use { output ->
+            zip.getInputStream(entry).use { input -> input.copyTo(output, IO_BUFFER) }
+        }
         packDao.setIcon(newId, target.absolutePath, now)
     }
 
@@ -235,7 +246,9 @@ class ProjectBackup(
         // 条目名由导出流程生成，此处只取 basename，杜绝 path traversal
         val base = entryName.substringAfterLast('/')
         val target = File(destDir, safeDiskName("${slot}__0__$base"))
-        target.outputStream().use { output -> zip.getInputStream(entry).copyTo(output) }
+        target.outputStream().buffered(IO_BUFFER).use { output ->
+            zip.getInputStream(entry).use { input -> input.copyTo(output, IO_BUFFER) }
+        }
         return target.absolutePath
     }
 
@@ -252,5 +265,8 @@ class ProjectBackup(
         private const val FORMAT_VERSION = "formatVersion"
         private const val JSON_ENTRY = "project.json"
         private const val PACK_ICON_ENTRY = "pack_icon.png"
+
+        /** ZIP 条目搬运缓冲区：默认 8KB 在几百张图标时会多出几十万次小读 */
+        private const val IO_BUFFER = 64 * 1024
     }
 }

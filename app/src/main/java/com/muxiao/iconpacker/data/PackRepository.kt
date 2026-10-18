@@ -43,6 +43,7 @@ class PackRepository(
     private val assetDao: IconAssetDao,
     private val fileStore: IconFileStore,
     private val appInfoProvider: AppInfoProvider,
+    private val appSettings: AppSettings,
     private val apkBuilder: ApkBuilder = ApkBuilder(),
     private val iconProcessor: IconProcessor = IconProcessor(),
 ) {
@@ -656,6 +657,9 @@ class PackRepository(
         return when (val result = apkBuilder.pack(request, onProgress)) {
             is PackResult.Success -> {
                 packDao.markPacked(packId, System.currentTimeMillis())
+                // 只留最近 N 份产物（N 见设置页"产物保留版本数"）：重装/导出永远
+                // 用最新那份，旧的纯占空间
+                fileStore.pruneArtifacts(packId, appSettings.keepArtifacts)
                 result
             }
             is PackResult.Failure -> result
@@ -713,6 +717,14 @@ class PackRepository(
     }
 
     // ---- 产物管理（FR-08） ----
+
+    /** 最新产物文件；不存在返回 null（列表据此判断能否直接安装/更新） */
+    suspend fun latestArtifactOf(packId: Long): File? = withContext(Dispatchers.IO) {
+        fileStore.latestArtifact(packId)
+    }
+
+    /** 私有目录占用（图标池 + 产物），列表概览用 */
+    suspend fun storageUsage(): StorageUsage = fileStore.storageUsage()
 
     /** 导出最新产物到用户选定 Uri；返回写入字节数 */
     suspend fun exportLatestArtifact(packId: Long, target: Uri): Long {

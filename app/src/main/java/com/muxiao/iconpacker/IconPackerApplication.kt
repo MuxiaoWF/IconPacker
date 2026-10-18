@@ -44,15 +44,17 @@ object ServiceLocator {
         val appContext = context.applicationContext
         val db = IconPackerDatabase.build(appContext)
         val fileStore = IconFileStore(appContext)
+        // settings 必须先于 repository：打包后的产物裁剪按设置里的保留数执行
+        settings = AppSettings(appContext)
         repository = PackRepository(
             packDao = db.packDao(),
             mappingDao = db.mappingDao(),
             assetDao = db.iconAssetDao(),
             fileStore = fileStore,
             appInfoProvider = AppInfoProvider(appContext),
+            appSettings = settings,
         )
         installedPackChecker = InstalledPackChecker(appContext)
-        settings = AppSettings(appContext)
         projectBackup = ProjectBackup(
             packDao = db.packDao(),
             mappingDao = db.mappingDao(),

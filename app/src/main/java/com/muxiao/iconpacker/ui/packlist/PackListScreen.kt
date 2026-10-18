@@ -1,6 +1,9 @@
 package com.muxiao.iconpacker.ui.packlist
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -28,13 +31,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -42,6 +48,8 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -64,6 +72,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
@@ -97,6 +106,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.Locale
 
 /**
  * 项目列表（FR-02）+ 产物管理（FR-08）。
@@ -115,9 +125,14 @@ fun PackListScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // 安装状态只有应用内操作才会触发重查，用户去系统设置装/卸载产物时库表毫无变化：
-    // 每次回到列表页（ON_RESUME）重查一次，避免徽标停在"已装/未装"的旧状态
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshInstalled() }
+    // 多选模式与批量队列：系统一次只允许一个安装/卸载界面，批量只能逐条发起
+    var selectionMode by remember { mutableStateOf(false) }
+    var pendingOps by remember { mutableStateOf<List<BulkOp>>(emptyList()) }
+    var waitingForSystemUi by remember { mutableStateOf(false) }
+    var sortMenuOpen by remember { mutableStateOf(false) }
+    var pendingUninstall by remember { mutableStateOf<PackEntity?>(null) }
+    val bulkScope = rememberCoroutineScope()
+
     // 新建：表单整体提升到 Screen（对话框只负责呈现与提交），启动器图标与
     // 密钥库文件的 SAF 结果要跨 Activity 生命周期回填表单，必须放在对话框外
     var createForm by remember { mutableStateOf<PackForm?>(null) }
@@ -152,15 +167,123 @@ fun PackListScreen(
      * 只删设备上那份 APK：项目数据与私有目录里的产物文件都在，可原样重装。
      * 个别 ROM 没有处理 ACTION_DELETE 的界面，退到该应用的系统详情页。
      */
-    fun uninstallPack(pack: PackEntity) {
-        val opened = runCatching {
-            context.startActivity(InstallHelper.uninstallIntent(pack.packageName))
+    fun openUninstall(packageName: String): Boolean {
+        val direct = runCatching {
+            context.startActivity(InstallHelper.uninstallIntent(packageName))
         }.isSuccess
-        if (opened) return
-        val fallback = runCatching {
-            context.startActivity(InstallHelper.appDetailsIntent(pack.packageName))
+        if (direct) return true
+        return runCatching {
+            context.startActivity(InstallHelper.appDetailsIntent(packageName))
+        }.isSuccess
+    }
+
+    fun launchUninstall(packageName: String) {
+        if (!openUninstall(packageName)) {
+            viewModel.postMessage(UiText(R.string.msg_uninstall_unavailable))
         }
-        if (fallback.isFailure) viewModel.postMessage(UiText(R.string.msg_uninstall_unavailable))
+    }
+
+    /**
+     * 卸载入口：首次先讲清后果（图标回落、数据保留），勾了"不再提示"后直达。
+     * 说明只影响提示，不影响卸载动作本身——用户点"继续卸载"就是明确同意。
+     */
+    fun requestUninstall(pack: PackEntity) {
+        if (settings.uninstallHintDismissed) {
+            launchUninstall(pack.packageName)
+        } else {
+            pendingUninstall = pack
+        }
+    }
+
+    /**
+     * 依次发起批量操作：系统一次只允许一个安装/卸载界面，必须等上一个返回。
+     * 队列在 ON_RESUME（见下方 LifecycleEventEffect）里续跑。
+     */
+    fun runNextOp() {
+        val op = pendingOps.firstOrNull()
+        if (op == null) {
+            waitingForSystemUi = false
+            return
+        }
+        pendingOps = pendingOps.drop(1)
+        when (op) {
+            is BulkOp.Uninstall -> {
+                waitingForSystemUi = true
+                if (!openUninstall(op.pack.packageName)) {
+                    waitingForSystemUi = false
+                    viewModel.postMessage(UiText(R.string.msg_uninstall_unavailable))
+                    runNextOp()
+                }
+            }
+
+            is BulkOp.Install -> bulkScope.launch {
+                val apk = viewModel.latestArtifact(op.pack.id)
+                if (apk == null) {
+                    viewModel.postMessage(UiText(R.string.err_no_artifact))
+                    runNextOp()
+                    return@launch
+                }
+                if (!InstallHelper.canInstallPackages(context)) {
+                    pendingOps = emptyList()
+                    waitingForSystemUi = false
+                    viewModel.postMessage(UiText(R.string.msg_build_unknown_sources_manual))
+                    return@launch
+                }
+                waitingForSystemUi = true
+                val opened = runCatching {
+                    context.startActivity(InstallHelper.installIntent(context, apk))
+                }.isSuccess
+                if (!opened) {
+                    waitingForSystemUi = false
+                    runNextOp()
+                }
+            }
+        }
+    }
+
+    fun startBulk(ops: List<BulkOp>) {
+        if (ops.isEmpty()) return
+        pendingOps = ops
+        runNextOp()
+    }
+
+    // 回到列表页：重查安装状态；批量队列在这里续跑（上一个系统界面刚返回）
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        viewModel.refreshInstalled()
+        if (waitingForSystemUi) {
+            waitingForSystemUi = false
+            if (pendingOps.isEmpty()) {
+                selectionMode = false
+                viewModel.clearSelection()
+            } else {
+                runNextOp()
+            }
+        }
+    }
+
+    // 包增删的动态监听：覆盖"列表页开着、在分屏/另一个窗口里装卸产物"的场景——
+    // 那种情况本应用不会经历 ON_RESUME，只有广播能通知到。普通前后台切换由上面兜底。
+    // dataScheme=package 是收得到系统包广播的前提；Android 13+ 注册须显式 flag，
+    // 系统广播对 NOT_EXPORTED 接收器照常投递（flag 只约束非系统发送方）。
+    DisposableEffect(Unit) {
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addDataScheme("package")
+        }
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(receiverContext: Context?, intent: Intent?) {
+                viewModel.refreshInstalled()
+            }
+        }
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        onDispose { context.unregisterReceiver(receiver) }
     }
 
     val packIconPicker = rememberLauncherForActivityResult(
@@ -253,6 +376,11 @@ fun PackListScreen(
         }
     }
 
+    val visiblePacks = state.visiblePacks
+    val selectedPacks = state.selectedIds.mapNotNull { id -> state.packs.firstOrNull { it.id == id } }
+    val installTargets = selectedPacks.filter(state::canInstall)
+    val uninstallTargets = selectedPacks.filter(state::canUninstall)
+
     AppScaffold(
         title = stringResource(R.string.packlist_title),
         snackbarHostState = snackbarHostState,
@@ -277,15 +405,50 @@ fun PackListScreen(
                 Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.cd_settings))
             }
         },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { createForm = PackForm(defaults = settings) },
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text(stringResource(R.string.packlist_new)) },
-                shape = CircleShape,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            )
+        floatingActionButton = if (selectionMode) {
+            null
+        } else {
+            {
+                ExtendedFloatingActionButton(
+                    onClick = { createForm = PackForm(defaults = settings) },
+                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                    text = { Text(stringResource(R.string.packlist_new)) },
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                )
+            }
+        },
+        // 多选模式：操作沉到底部，拇指可达，也让"没选中时按钮全灰"这件事一眼可见
+        bottomBar = if (selectionMode) {
+            {
+                BulkActionBar(
+                    selectedCount = state.selectedIds.size,
+                    canInstall = installTargets.isNotEmpty(),
+                    canUninstall = uninstallTargets.isNotEmpty(),
+                    onSelectAll = { viewModel.selectAll(visiblePacks.map { it.id }) },
+                    onInstall = {
+                        if (installTargets.isEmpty()) {
+                            viewModel.postMessage(UiText(R.string.msg_bulk_install_none))
+                        } else {
+                            startBulk(installTargets.map { BulkOp.Install(it) })
+                        }
+                    },
+                    onUninstall = {
+                        if (uninstallTargets.isEmpty()) {
+                            viewModel.postMessage(UiText(R.string.msg_bulk_uninstall_none))
+                        } else {
+                            startBulk(uninstallTargets.map { BulkOp.Uninstall(it) })
+                        }
+                    },
+                    onExit = {
+                        selectionMode = false
+                        viewModel.clearSelection()
+                    },
+                )
+            }
+        } else {
+            null
         },
     ) { innerPadding ->
         if (state.packs.isEmpty() && !state.loading) {
@@ -309,15 +472,97 @@ fun PackListScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(Layout.cardGap),
             ) {
-                item(key = "pack-count") {
-                    Text(
-                        text = stringResource(R.string.packlist_count, state.packs.size),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = Spacing.xs, bottom = Spacing.xs),
-                    )
+                item(key = "list-header") {
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        OutlinedTextField(
+                            value = state.query,
+                            onValueChange = viewModel::setQuery,
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text(stringResource(R.string.packlist_search_hint)) },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                            trailingIcon = {
+                                if (state.query.isNotEmpty()) {
+                                    IconButton(onClick = { viewModel.setQuery("") }) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = stringResource(R.string.common_clear),
+                                        )
+                                    }
+                                }
+                            },
+                            singleLine = true,
+                            shape = MaterialTheme.shapes.large,
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = stringResource(
+                                    R.string.packlist_overview,
+                                    state.packs.size,
+                                    state.installedCount,
+                                    state.usage?.let { formatBytes(it.totalBytes) } ?: "…",
+                                ),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Box {
+                                TextButton(onClick = { sortMenuOpen = true }) {
+                                    Text(stringResource(R.string.packlist_sort))
+                                }
+                                DropdownMenu(
+                                    expanded = sortMenuOpen,
+                                    onDismissRequest = { sortMenuOpen = false },
+                                ) {
+                                    listOf(
+                                        PackSort.RECENT to R.string.packlist_sort_recent,
+                                        PackSort.NAME to R.string.packlist_sort_name,
+                                        PackSort.INSTALLED to R.string.packlist_sort_installed,
+                                    ).forEach { (value, label) ->
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(label)) },
+                                            trailingIcon = {
+                                                if (state.sort == value) {
+                                                    Icon(Icons.Default.Check, contentDescription = null)
+                                                }
+                                            },
+                                            onClick = {
+                                                sortMenuOpen = false
+                                                viewModel.setSort(value)
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+                            TextButton(
+                                onClick = {
+                                    selectionMode = !selectionMode
+                                    if (!selectionMode) viewModel.clearSelection()
+                                },
+                            ) {
+                                Text(
+                                    stringResource(
+                                        if (selectionMode) {
+                                            R.string.packlist_select_done
+                                        } else {
+                                            R.string.packlist_select
+                                        },
+                                    ),
+                                )
+                            }
+                        }
+                    }
                 }
-                items(state.packs, key = { it.id }) { pack ->
+                if (visiblePacks.isEmpty()) {
+                    item(key = "no-match") {
+                        Text(
+                            text = stringResource(R.string.packlist_no_match),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = Spacing.xs, top = Spacing.sm),
+                        )
+                    }
+                }
+                items(visiblePacks, key = { it.id }) { pack ->
                     PackItem(
                         pack = pack,
                         status = state.statusOf(pack),
@@ -325,14 +570,17 @@ fun PackListScreen(
                         installedVersion = state.installedVersions[pack.packageName],
                         exporting = state.exportingPackId == pack.id,
                         backing = state.backupBusyPackId == pack.id,
+                        selectable = selectionMode,
+                        selected = pack.id in state.selectedIds,
                         onClick = { onOpenPack(pack.id) },
+                        onToggleSelect = { viewModel.toggleSelection(pack.id) },
                         onEdit = {
                             pendingEdit = pack
                             pendingEditForm = PackForm(pack)
                         },
                         onDuplicate = { viewModel.duplicatePack(pack) },
                         onExport = { pendingExport = pack },
-                        onUninstall = { uninstallPack(pack) },
+                        onUninstall = { requestUninstall(pack) },
                         onExportBackup = { pendingBackupExport = pack },
                         onDelete = { pendingDelete = pack },
                     )
@@ -402,6 +650,40 @@ fun PackListScreen(
                 }
                 pendingEdit = null
                 pendingEditForm = null
+            },
+        )
+    }
+
+    // 卸载前的一次性说明：讲清「图标回落但项目数据保留」，勾选后不再打扰
+    pendingUninstall?.let { pack ->
+        var neverAsk by remember(pack.id) { mutableStateOf(false) }
+        AlertDialog(
+            onDismissRequest = { pendingUninstall = null },
+            title = { Text(stringResource(R.string.uninstall_hint_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Text(stringResource(R.string.uninstall_hint_body))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = neverAsk, onCheckedChange = { neverAsk = it })
+                        Text(stringResource(R.string.uninstall_hint_never))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (neverAsk) viewModel.dismissUninstallHint()
+                        pendingUninstall = null
+                        launchUninstall(pack.packageName)
+                    },
+                ) {
+                    Text(stringResource(R.string.uninstall_hint_continue))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingUninstall = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
             },
         )
     }
@@ -554,7 +836,10 @@ private fun PackItem(
     installedVersion: Long?,
     exporting: Boolean,
     backing: Boolean,
+    selectable: Boolean = false,
+    selected: Boolean = false,
     onClick: () -> Unit,
+    onToggleSelect: () -> Unit = {},
     onEdit: () -> Unit,
     onDuplicate: () -> Unit,
     onExport: () -> Unit,
@@ -565,10 +850,14 @@ private fun PackItem(
     val palette = LocalAppPalette.current
     var menuExpanded by remember { mutableStateOf(false) }
     Card(
-        onClick = onClick,
+        onClick = if (selectable) onToggleSelect else onClick,
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(
-            containerColor = palette.card,
+            containerColor = if (selected) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                palette.card
+            },
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
@@ -580,6 +869,11 @@ private fun PackItem(
             modifier = Modifier.padding(start = Spacing.md, end = Spacing.xs, top = Spacing.md, bottom = Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (selectable) {
+                // 勾选框在缩略图左侧：多选态下"这张卡是否已选"必须先于"它是谁"被看到
+                Checkbox(checked = selected, onCheckedChange = { onToggleSelect() })
+                Spacer(modifier = Modifier.size(Spacing.xs))
+            }
             PackIconThumbnail(path = pack.iconPath)
             Spacer(modifier = Modifier.size(Spacing.md))
             Column(modifier = Modifier.weight(1f)) {
@@ -648,7 +942,8 @@ private fun PackItem(
             }
             if (exporting || backing) {
                 CircularProgressIndicator(modifier = Modifier.size(IconSize.progressSmall))
-            } else {
+            } else if (!selectable) {
+                // 多选态下卡片整体就是"切换勾选"，再留溢出菜单只会让人误点
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
                         Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.cd_more))
@@ -922,5 +1217,92 @@ private fun CreatePackDialog(
             onPickIcon = onPickIcon,
             onClearIcon = if (form.iconUri != null) onClearIcon else null,
         )
+    }
+}
+
+/** 批量队列里的一步操作：安装取最新产物，卸载走系统卸载界面 */
+private sealed interface BulkOp {
+    val pack: PackEntity
+
+    data class Install(override val pack: PackEntity) : BulkOp
+
+    data class Uninstall(override val pack: PackEntity) : BulkOp
+}
+
+/**
+ * 批量操作条（多选态底部）。
+ *
+ * 分两行而不是一行塞五个按钮：一行在 360dp 屏上必然挤成省略号，
+ * 而装/卸是本模式唯一的目的，必须完整可见。
+ */
+@Composable
+private fun BulkActionBar(
+    selectedCount: Int,
+    canInstall: Boolean,
+    canUninstall: Boolean,
+    onSelectAll: () -> Unit,
+    onInstall: () -> Unit,
+    onUninstall: () -> Unit,
+    onExit: () -> Unit,
+) {
+    val palette = LocalAppPalette.current
+    Surface(color = palette.card, tonalElevation = 0.dp) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = Layout.pageHorizontal, vertical = Spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.packlist_selected_count, selectedCount),
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onSelectAll, enabled = selectedCount >= 0) {
+                    Text(stringResource(R.string.packlist_select_all))
+                }
+                TextButton(onClick = onExit) {
+                    Text(stringResource(R.string.packlist_select_done))
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Button(
+                    onClick = onInstall,
+                    enabled = canInstall,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(stringResource(R.string.packlist_bulk_install))
+                }
+                OutlinedButton(
+                    onClick = onUninstall,
+                    enabled = canUninstall,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(
+                        text = stringResource(R.string.packlist_bulk_uninstall),
+                        color = if (canUninstall) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 字节数的人类可读形式：概览条只放得下一小段，所以按 GB/MB/KB 降级 */
+private fun formatBytes(bytes: Long): String {
+    val kb = 1024.0
+    val mb = kb * 1024
+    val gb = mb * 1024
+    return when {
+        bytes >= gb -> String.format(Locale.getDefault(), "%.1f GB", bytes / gb)
+        bytes >= mb -> String.format(Locale.getDefault(), "%.1f MB", bytes / mb)
+        bytes >= kb -> String.format(Locale.getDefault(), "%.0f KB", bytes / kb)
+        else -> "$bytes B"
     }
 }

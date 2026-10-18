@@ -32,6 +32,8 @@
     <string name="settings_section_defaults">Defaults for new projects</string>
     <string name="settings_default_version_name">Default version name</string>
     <string name="settings_default_version_name_hint">Leave blank to use the built-in default (1.0)</string>
+    <string name="settings_keep_artifacts">Artifacts to keep</string>
+    <string name="settings_keep_artifacts_desc">After a successful pack, only the newest artifact APKs are kept and older ones are pruned automatically. Installed apps and project data are unaffected.</string>
     <string name="settings_default_signer_name">Default signer name</string>
     <string name="settings_default_signer_name_hint">File name used by the v1 signing entry; leave blank for the built-in default</string>
     <string name="settings_default_schemes">Default signing schemes</string>
@@ -109,6 +111,25 @@
     <string name="packlist_install_not_installed">Not installed</string>
     <string name="packlist_install_latest">Up to date</string>
     <string name="packlist_install_update">Update available (installed v%1$d → v%2$d)</string>
+    <string name="packlist_search_hint">Search by name or package</string>
+    <string name="packlist_overview">%1$d projects · %2$d installed · %3$s used</string>
+    <string name="packlist_sort">Sort</string>
+    <string name="packlist_sort_recent">Recently updated</string>
+    <string name="packlist_sort_name">Name</string>
+    <string name="packlist_sort_installed">Installed first</string>
+    <string name="packlist_select">Select</string>
+    <string name="packlist_select_done">Done</string>
+    <string name="packlist_selected_count">%1$d selected</string>
+    <string name="packlist_select_all">Select all</string>
+    <string name="packlist_no_match">No matching projects</string>
+    <string name="packlist_bulk_install">Install / reinstall</string>
+    <string name="packlist_bulk_uninstall">Uninstall</string>
+    <string name="msg_bulk_install_none">The selected projects have no artifact to install. Pack them first.</string>
+    <string name="msg_bulk_uninstall_none">None of the selected projects is installed.</string>
+    <string name="uninstall_hint_title">Uninstall icon pack?</string>
+    <string name="uninstall_hint_body">Home screen icons will fall back to system defaults; your layout is unaffected. Project data and generated artifacts stay on the device, so you can reinstall anytime.</string>
+    <string name="uninstall_hint_never">Don\'t show again</string>
+    <string name="uninstall_hint_continue">Uninstall</string>
     <string name="cd_more">More actions</string>
     <string name="cd_pack_icon">Icon pack icon</string>
     <string name="pack_icon_unset">Not set</string>
@@ -389,7 +410,6 @@
     <string name="msg_build_no_launcher">No third-party launcher found</string>
 
     <!-- ===== Layout refresh (2026-10): summaries, empty states, metric labels ===== -->
-    <string name="packlist_count">%1$d icon packs</string>
     <string name="packlist_meta">%1$s (v%2$d) · %3$s</string>
     <string name="packlist_next_version_short">Next v%1$d</string>
     <string name="packlist_empty_title">No icon packs yet</string>

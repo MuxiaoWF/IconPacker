@@ -46,9 +46,22 @@ class AppSettings(context: Context) {
         val keystorePath: String = "",
         /** 默认密钥别名 */
         val keystoreAlias: String = "",
+        /**
+         * 卸载产物前的一次性说明是否已被用户勾选"不再提示"。
+         * 只影响提示展示，不影响卸载行为本身。
+         */
+        val uninstallHintDismissed: Boolean = false,
+        /**
+         * 每个项目保留的产物版本数：打包成功后更早的 `pack-v*.apk` 会被清理。
+         * 只影响私有目录占用，不触碰已安装的应用。
+         */
+        val keepArtifacts: Int = IconFileStore.DEFAULT_KEEP_ARTIFACTS,
     )
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    /** 当前产物保留数（仓库层打包后裁剪用，免得持流取值） */
+    val keepArtifacts: Int get() = state.value.keepArtifacts
 
     private val _state = MutableStateFlow(read())
     val state: StateFlow<State> = _state.asStateFlow()
@@ -88,6 +101,14 @@ class AppSettings(context: Context) {
 
     fun setKeystoreAlias(value: String) = edit { it.putString(KEY_KEYSTORE_ALIAS, value.trim()) }
 
+    /** 勾选"不再提示卸载说明" */
+    fun setUninstallHintDismissed(value: Boolean) = edit { it.putBoolean(KEY_UNINSTALL_HINT, value) }
+
+    /** 产物保留版本数；落盘前钳制到合法区间，界面只提供其中的几档 */
+    fun setKeepArtifacts(value: Int) = edit {
+        it.putInt(KEY_KEEP_ARTIFACTS, value.coerceIn(MIN_KEEP_ARTIFACTS, MAX_KEEP_ARTIFACTS))
+    }
+
     /** 清除默认签名身份：回到设备端生成密钥 */
     fun clearKeystore() = edit {
         it.putBoolean(KEY_IMPORTED_KEYSTORE, false)
@@ -112,6 +133,9 @@ class AppSettings(context: Context) {
         importedKeystore = prefs.getBoolean(KEY_IMPORTED_KEYSTORE, false),
         keystorePath = prefs.getString(KEY_KEYSTORE_PATH, "").orEmpty(),
         keystoreAlias = prefs.getString(KEY_KEYSTORE_ALIAS, "").orEmpty(),
+        uninstallHintDismissed = prefs.getBoolean(KEY_UNINSTALL_HINT, false),
+        keepArtifacts = prefs.getInt(KEY_KEEP_ARTIFACTS, IconFileStore.DEFAULT_KEEP_ARTIFACTS)
+            .coerceIn(MIN_KEEP_ARTIFACTS, MAX_KEEP_ARTIFACTS),
     )
 
     companion object {
@@ -141,5 +165,11 @@ class AppSettings(context: Context) {
         private const val KEY_IMPORTED_KEYSTORE = "default_imported_keystore"
         private const val KEY_KEYSTORE_PATH = "default_keystore_path"
         private const val KEY_KEYSTORE_ALIAS = "default_keystore_alias"
+        private const val KEY_UNINSTALL_HINT = "uninstall_hint_dismissed"
+        private const val KEY_KEEP_ARTIFACTS = "keep_artifacts"
+
+        /** 产物保留数的合法区间（界面档位是其中的子集） */
+        const val MIN_KEEP_ARTIFACTS = 1
+        const val MAX_KEEP_ARTIFACTS = 10
     }
 }

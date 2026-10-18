@@ -13,6 +13,7 @@ import com.muxiao.iconpacker.data.InstalledPackChecker
 import com.muxiao.iconpacker.data.PackEntity
 import com.muxiao.iconpacker.data.PackRepository
 import com.muxiao.iconpacker.data.PackSignConfig
+import com.muxiao.iconpacker.data.StorageUsage
 import com.muxiao.iconpacker.domain.PackVersionRules
 import com.muxiao.iconpacker.ui.components.UiText
 import com.muxiao.iconpacker.ui.components.uiMessage
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.File
 
 /** 项目列表状态（FR-02 + FR-08 产物管理） */
 data class PackListUiState(
@@ -37,11 +39,20 @@ data class PackListUiState(
      * 否则所有项目会共享同一个（且多半是错的）安装状态。
      */
     val installedVersions: Map<String, Long> = emptyMap(),
+    /** 磁盘上有产物（`pack-v*.apk`）的项目 id：决定"安装/更新"是否可用，不重新打包 */
+    val installableIds: Set<Long> = emptySet(),
     val exportingPackId: Long? = null,
     /** 正在导出备份 ZIP 的项目 id（v8） */
     val backupBusyPackId: Long? = null,
     /** 备份导入进行中（v8）；完成后 createdPackId 被置位跳转映射工作台 */
     val importingBackup: Boolean = false,
+    /** 搜索关键词（匹配项目名与包名） */
+    val query: String = "",
+    val sort: PackSort = PackSort.RECENT,
+    /** 多选模式：已勾选的项目 id */
+    val selectedIds: Set<Long> = emptySet(),
+    /** 私有目录占用（异步统计，首次拿到前为 null） */
+    val usage: StorageUsage? = null,
     val message: UiText? = null,
     /** 刚创建成功的项目 id（用于创建后直达编辑页，消费后置空） */
     val createdPackId: Long? = null,
@@ -60,8 +71,48 @@ data class PackListUiState(
             pack.versionCode.toLong() -> UiText(R.string.packlist_install_latest)
             else -> UiText(R.string.packlist_install_update, installed, pack.versionCode)
         }
+
+    /** 设备上已装的项目数（概览条用） */
+    val installedCount: Int get() = packs.count { it.packageName in installedVersions }
+
+    fun canUninstall(pack: PackEntity): Boolean = pack.packageName in installedVersions
+
+    fun canInstall(pack: PackEntity): Boolean = pack.id in installableIds
+
+    /**
+     * 按搜索词过滤 + 排序后的可见列表。
+     *
+     * 过滤放在内存里而不是 DAO：项目量级是几十条，改 SQL 只会把"排序/过滤"
+     * 拆成两处逻辑；`RECENT` 直接沿用 DAO 的 updatedAt DESC，顺序不变。
+     */
+    val visiblePacks: List<PackEntity>
+        get() {
+            val keyword = query.trim()
+            val filtered = if (keyword.isEmpty()) {
+                packs
+            } else {
+                packs.filter {
+                    it.name.contains(keyword, ignoreCase = true) ||
+                        it.packageName.contains(keyword, ignoreCase = true)
+                }
+            }
+            return when (sort) {
+                PackSort.RECENT -> filtered
+                PackSort.NAME -> filtered.sortedBy { it.name.lowercase() }
+                PackSort.INSTALLED -> filtered.sortedWith(
+                    compareBy<PackEntity>(
+                        { it.packageName !in installedVersions },
+                        { -it.updatedAt },
+                    ),
+                )
+            }
+        }
 }
 
+/** 列表排序方式 */
+enum class PackSort { RECENT, NAME, INSTALLED }
+
+/** 项目自身的打包状态 */
 enum class PackStatus { NEVER_PACKED, DIRTY, PACKED }
 
 class PackListViewModel(
@@ -88,9 +139,41 @@ class PackListViewModel(
     private val backupBusyFlow = MutableStateFlow<Long?>(null)
     private val importingBackupFlow = MutableStateFlow(false)
 
-    private val packExtrasFlow = combine(createdPackIdFlow, backupBusyFlow, importingBackupFlow) {
-            createdPackId, backupBusy, importing ->
-        Triple(createdPackId, backupBusy, importing)
+    // ---- 列表筛选 / 多选（纯 UI 状态，不进数据库）----
+    private val queryFlow = MutableStateFlow("")
+    private val sortFlow = MutableStateFlow(PackSort.RECENT)
+    private val selectionFlow = MutableStateFlow<Set<Long>>(emptySet())
+
+    private data class Extras(
+        val createdPackId: Long?,
+        val backupBusyPackId: Long?,
+        val importingBackup: Boolean,
+        val message: UiText?,
+    )
+
+    private data class Prefs(
+        val query: String,
+        val sort: PackSort,
+        val selected: Set<Long>,
+    )
+
+    private data class DeviceState(
+        val installed: Map<String, Long>,
+        val installable: Set<Long>,
+        val usage: StorageUsage?,
+    )
+
+    private val extrasFlow = combine(
+        createdPackIdFlow,
+        backupBusyFlow,
+        importingBackupFlow,
+        messageFlow,
+    ) { createdPackId, backupBusy, importing, message ->
+        Extras(createdPackId, backupBusy, importing, message)
+    }
+
+    private val prefsFlow = combine(queryFlow, sortFlow, selectionFlow) { query, sort, selected ->
+        Prefs(query, sort, selected)
     }
 
     /** 逐项目查询安装状态；PackageManager 调用不能占主线程 */
@@ -104,22 +187,48 @@ class PackListViewModel(
             }
             .flowOn(Dispatchers.IO)
 
+    /** 磁盘上是否还有该项目的产物（有就能直接安装/更新，不必重新打包） */
+    private val installableFlow: Flow<Set<Long>> =
+        combine(packsFlow, refreshTrigger) { packs, _ -> packs }
+            .map { packs ->
+                packs.mapNotNull { pack ->
+                    pack.id.takeIf { repository.latestArtifactOf(it) != null }
+                }.toSet()
+            }
+            .flowOn(Dispatchers.IO)
+
+    /** 私有目录占用：随项目变更与刷新信号重算（几百次 stat，代价可忽略） */
+    private val usageFlow: Flow<StorageUsage?> =
+        combine(packsFlow, refreshTrigger) { packs, _ -> packs }
+            .map { repository.storageUsage() }
+            .flowOn(Dispatchers.IO)
+
+    private val deviceFlow = combine(installedFlow, installableFlow, usageFlow) { installed, installable, usage ->
+        DeviceState(installed, installable, usage)
+    }
+
     val uiState: StateFlow<PackListUiState> = combine(
         packsFlow,
-        installedFlow,
+        deviceFlow,
+        prefsFlow,
+        extrasFlow,
         exportingFlow,
-        messageFlow,
-        packExtrasFlow,
-    ) { packs, installed, exporting, message, extras ->
+    ) { packs, device, prefs, extras, exporting ->
         PackListUiState(
             packs = packs,
             loading = false,
-            installedVersions = installed,
+            installedVersions = device.installed,
+            installableIds = device.installable,
+            usage = device.usage,
             exportingPackId = exporting,
-            message = message,
-            createdPackId = extras.first,
-            backupBusyPackId = extras.second,
-            importingBackup = extras.third,
+            message = extras.message,
+            createdPackId = extras.createdPackId,
+            backupBusyPackId = extras.backupBusyPackId,
+            importingBackup = extras.importingBackup,
+            query = prefs.query,
+            sort = prefs.sort,
+            // 项目被删/被筛掉后，残留的勾选不再计入（避免"已选 3 项"却只有 1 个匹配项）
+            selectedIds = prefs.selected intersect packs.map { it.id }.toSet(),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PackListUiState())
 
@@ -127,10 +236,38 @@ class PackListViewModel(
         refreshInstalled()
     }
 
-    /** 查询已安装产物版本（回到列表页时刷新） */
+    /** 手动刷新：安装状态、产物存在性、占用一起重查 */
     fun refreshInstalled() {
         refreshTrigger.value++
     }
+
+    // ---- 搜索 / 排序 / 多选 ----
+
+    fun setQuery(value: String) {
+        queryFlow.value = value
+    }
+
+    fun setSort(value: PackSort) {
+        sortFlow.value = value
+    }
+
+    fun toggleSelection(packId: Long) {
+        selectionFlow.value = selectionFlow.value.let { if (packId in it) it - packId else it + packId }
+    }
+
+    fun selectAll(ids: Collection<Long>) {
+        selectionFlow.value = ids.toSet()
+    }
+
+    fun clearSelection() {
+        selectionFlow.value = emptySet()
+    }
+
+    /** 记住"卸载说明不再提示" */
+    fun dismissUninstallHint() = settings.setUninstallHintDismissed(true)
+
+    /** 最新产物文件（列表内直接安装用）；无产物时为 null */
+    suspend fun latestArtifact(packId: Long): File? = repository.latestArtifactOf(packId)
 
     /**
      * 新建图标包（完整表单版，FR-02）。

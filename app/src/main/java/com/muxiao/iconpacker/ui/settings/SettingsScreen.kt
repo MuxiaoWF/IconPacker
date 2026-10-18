@@ -192,6 +192,31 @@ fun SettingsScreen(
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
+                Spacer(modifier = Modifier.size(Spacing.md))
+                // 产物保留数：离散档位用芯片而不是数字输入框——与整页交互一致，
+                // 也免去"清空输入框瞬间被钳回默认值"的输入竞态
+                Text(
+                    text = stringResource(R.string.settings_keep_artifacts),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    KEEP_ARTIFACT_OPTIONS.forEach { option ->
+                        AppChip(
+                            selected = state.keepArtifacts == option,
+                            label = option.toString(),
+                            onClick = { settings.setKeepArtifacts(option) },
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.size(Spacing.sm))
+                Text(
+                    text = stringResource(R.string.settings_keep_artifacts_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             // ---- 签名身份：设备密钥 / 导入密钥库 + 方案 + 签名者名 ----
@@ -381,3 +406,6 @@ private fun switchLocale(settings: AppSettings, context: android.content.Context
     settings.setLocaleMode(mode)
     (context as? Activity)?.recreate()
 }
+
+/** 产物保留数的界面档位（合法区间 1–10，见 AppSettings 的钳制） */
+private val KEEP_ARTIFACT_OPTIONS = listOf(1, 3, 5, 10)
