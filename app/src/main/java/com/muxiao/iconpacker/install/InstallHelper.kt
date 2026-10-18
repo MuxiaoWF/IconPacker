@@ -53,6 +53,22 @@ object InstallHelper {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
 
+    /**
+     * 卸载产物意图：交给系统包安装器，确认框由系统提供。
+     *
+     * 产物是独立 APK（包名见 `PackageNameRules`），卸载只影响设备上的那一份，
+     * 项目数据与私有目录里的产物文件都不受影响。
+     */
+    fun uninstallIntent(packageName: String): Intent =
+        Intent(Intent.ACTION_DELETE, "package:$packageName".toUri())
+
+    /**
+     * 兜底入口：个别 ROM 没有处理 ACTION_DELETE 的界面，退到该应用的系统详情页，
+     * 用户仍可在此卸载（避免按钮点了没反应）。
+     */
+    fun appDetailsIntent(packageName: String): Intent =
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:$packageName".toUri())
+
     /** 当前默认启动器包名（FR-07 引导用） */
     fun currentLauncherPackage(context: Context): String? {
         val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)

@@ -124,6 +124,7 @@
     <!-- ===== Context menus ===== -->
     <string name="menu_edit_pack">Edit name &amp; icon</string>
     <string name="menu_export_artifact">Export artifact</string>
+    <string name="menu_uninstall_pack">Uninstall icon pack</string>
     <string name="menu_duplicate">Duplicate project</string>
     <string name="menu_export_backup">Export project backup (ZIP, no keystore)</string>
 
@@ -131,6 +132,7 @@
     <string name="msg_version_code_invalid">Version code must be an integer greater than 0</string>
     <string name="msg_keystore_read_failed">Couldn\'t read the keystore file: %1$s</string>
     <string name="msg_icon_read_failed">Couldn\'t read the selected image. Try another one.</string>
+    <string name="msg_uninstall_unavailable">No uninstaller is available here; uninstall the icon pack from system settings.</string>
     <string name="msg_pack_created_icon_failed">The icon pack was created, but setting its icon failed: %1$s</string>
     <string name="msg_create_failed">Creation failed: %1$s</string>
     <string name="msg_sign_config_updated">Signing configuration updated</string>

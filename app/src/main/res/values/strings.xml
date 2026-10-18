@@ -124,6 +124,7 @@
     <!-- ===== 通用菜单 ===== -->
     <string name="menu_edit_pack">编辑名称与图标</string>
     <string name="menu_export_artifact">导出产物</string>
+    <string name="menu_uninstall_pack">卸载图标包</string>
     <string name="menu_duplicate">复制项目</string>
     <string name="menu_export_backup">导出项目备份（ZIP，不含密钥库）</string>
 
@@ -131,6 +132,7 @@
     <string name="msg_version_code_invalid">版本号必须是大于 0 的整数</string>
     <string name="msg_keystore_read_failed">无法读取密钥库文件：%1$s</string>
     <string name="msg_icon_read_failed">无法读取所选图片，请换一张试试</string>
+    <string name="msg_uninstall_unavailable">没有可用的卸载界面，请在系统设置中卸载该图标包</string>
     <string name="msg_pack_created_icon_failed">已创建图标包，但图标设置失败：%1$s</string>
     <string name="msg_create_failed">创建失败：%1$s</string>
     <string name="msg_sign_config_updated">签名配置已更新</string>

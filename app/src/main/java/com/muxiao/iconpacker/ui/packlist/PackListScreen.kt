@@ -64,8 +64,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -74,6 +76,7 @@ import com.muxiao.iconpacker.data.IconFileStore
 import com.muxiao.iconpacker.data.PackEntity
 import com.muxiao.iconpacker.data.toSignConfig
 import com.muxiao.iconpacker.domain.PackVersionRules
+import com.muxiao.iconpacker.install.InstallHelper
 import com.muxiao.iconpacker.ui.IconImage
 import com.muxiao.iconpacker.ui.sampleSizeFor
 import com.muxiao.iconpacker.ui.editor.IconEditorScreen
@@ -111,6 +114,10 @@ fun PackListScreen(
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // 安装状态只有应用内操作才会触发重查，用户去系统设置装/卸载产物时库表毫无变化：
+    // 每次回到列表页（ON_RESUME）重查一次，避免徽标停在"已装/未装"的旧状态
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshInstalled() }
     // 新建：表单整体提升到 Screen（对话框只负责呈现与提交），启动器图标与
     // 密钥库文件的 SAF 结果要跨 Activity 生命周期回填表单，必须放在对话框外
     var createForm by remember { mutableStateOf<PackForm?>(null) }
@@ -137,6 +144,23 @@ fun PackListScreen(
             }
             packIconEdit = PackIconEdit(sourcePath = staged, pack = pack)
         }
+    }
+
+    /**
+     * 卸载已安装的产物：跳系统卸载界面（"确定卸载"由系统提供，无需再弹自研确认框）。
+     *
+     * 只删设备上那份 APK：项目数据与私有目录里的产物文件都在，可原样重装。
+     * 个别 ROM 没有处理 ACTION_DELETE 的界面，退到该应用的系统详情页。
+     */
+    fun uninstallPack(pack: PackEntity) {
+        val opened = runCatching {
+            context.startActivity(InstallHelper.uninstallIntent(pack.packageName))
+        }.isSuccess
+        if (opened) return
+        val fallback = runCatching {
+            context.startActivity(InstallHelper.appDetailsIntent(pack.packageName))
+        }
+        if (fallback.isFailure) viewModel.postMessage(UiText(R.string.msg_uninstall_unavailable))
     }
 
     val packIconPicker = rememberLauncherForActivityResult(
@@ -308,6 +332,7 @@ fun PackListScreen(
                         },
                         onDuplicate = { viewModel.duplicatePack(pack) },
                         onExport = { pendingExport = pack },
+                        onUninstall = { uninstallPack(pack) },
                         onExportBackup = { pendingBackupExport = pack },
                         onDelete = { pendingDelete = pack },
                     )
@@ -533,6 +558,7 @@ private fun PackItem(
     onEdit: () -> Unit,
     onDuplicate: () -> Unit,
     onExport: () -> Unit,
+    onUninstall: () -> Unit,
     onExportBackup: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -646,6 +672,17 @@ private fun PackItem(
                             },
                             enabled = pack.lastPackedAt != null,
                         )
+                        // 仅在设备上确有该产物时出现：未安装的条目没有可卸载的对象，
+                        // 置灰只会让人以为是"点不了"，不如整项隐藏
+                        if (installedVersion != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.menu_uninstall_pack)) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onUninstall()
+                                },
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.menu_duplicate)) },
                             onClick = {
