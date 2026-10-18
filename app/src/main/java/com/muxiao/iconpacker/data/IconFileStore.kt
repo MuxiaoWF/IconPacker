@@ -38,6 +38,16 @@ import java.util.zip.ZipInputStream
  * [extractZipImages]）。这三件事是"导入即建立映射"的前提——路径与 appfilter 都携带
  * 映射所需的信息，丢了就只能靠文件名猜。
  */
+/**
+ * 纯函数：按版本号新 → 旧排序后，取第 [keep] 位之后的产物（待删除）。
+ *
+ * 与 [IconFileStore.artifactHistory] 共用同一套"按版本号数字比较"的口径——
+ * `pack-v9` 与 `pack-v10` 的字典序陷阱只允许存在一份防御。
+ * `keep < 1` 一律按 1 处理：至少保住最新一份，否则导出/重装会突然落空。
+ */
+internal fun pruneSelection(artifacts: List<ArtifactInfo>, keep: Int): List<ArtifactInfo> =
+    artifacts.sortedByDescending { it.versionCode }.drop(keep.coerceAtLeast(1))
+
 /** 私有目录占用统计（字节） */
 data class StorageUsage(val iconsBytes: Long, val outputsBytes: Long) {
     val totalBytes: Long get() = iconsBytes + outputsBytes
@@ -109,8 +119,8 @@ class IconFileStore(
     /** 删除单个产物文件（产物历史页的手动清理入口） */
     suspend fun deleteArtifact(file: File): Boolean = withContext(Dispatchers.IO) { file.delete() }
 
-    /** 从 `pack-v<N>.apk` 解析版本号；解析不出返回 0 */
-    private fun versionCodeOfArtifact(fileName: String): Long =
+    /** 从 `pack-v<N>.apk` 解析版本号；解析不出返回 0（internal：单测守住字典序陷阱） */
+    internal fun versionCodeOfArtifact(fileName: String): Long =
         fileName.removePrefix("pack-v")
             .removeSuffix(".apk")
             .substringBefore('.')
@@ -136,12 +146,11 @@ class IconFileStore(
      */
     suspend fun pruneArtifacts(packId: Long, keep: Int = DEFAULT_KEEP_ARTIFACTS): Int =
         withContext(Dispatchers.IO) {
-            val keepCount = keep.coerceAtLeast(1)
             val artifacts = outputDir(packId)
                 .listFiles { file -> file.name.startsWith("pack-v") && file.name.endsWith(".apk") }
-                ?.sortedByDescending { versionCodeOfArtifact(it.name) }
+                ?.map { ArtifactInfo(versionCodeOfArtifact(it.name), it) }
                 ?: return@withContext 0
-            artifacts.drop(keepCount).count { it.delete() }
+            pruneSelection(artifacts, keep).count { it.file.delete() }
         }
 
     /** 私有目录占用（图标池 + 产物），供列表概览展示 */

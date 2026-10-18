@@ -16,9 +16,6 @@ import com.muxiao.iconpacker.core.packer.engine.IconMatchKeys
  *
  * 为什么包名维度优先：大量第三方图标包 ZIP 按包名命名文件（com.android.chrome.png），
  * 此时标签匹配对中文名应用（设置 ↔ com.android.settings）完全无效，包名是更可靠的键。
- *
- * 已知边界（docs/features.md 记录，二期改进）：中文应用名与英文文件名的拼音匹配
- * （相机 ↔ camera）暂不支持，计划引入 TinyPinyin 类库补拼音首字母维度。
  */
 object AppMatcher {
 

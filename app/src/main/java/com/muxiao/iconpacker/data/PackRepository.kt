@@ -651,20 +651,25 @@ class PackRepository(
         )
     }
 
-    /** 打包并标记状态；调用方自行切 IO 线程 */
-    suspend fun buildPack(packId: Long, onProgress: PackProgress = { _, _, _ -> }): PackResult {
-        val request = prepareBuild(packId)
-        return when (val result = apkBuilder.pack(request, onProgress)) {
-            is PackResult.Success -> {
-                packDao.markPacked(packId, System.currentTimeMillis())
-                // 只留最近 N 份产物（N 见设置页"产物保留版本数"）：重装/导出永远
-                // 用最新那份，旧的纯占空间
-                fileStore.pruneArtifacts(packId, appSettings.keepArtifacts)
-                result
+    /**
+     * 打包并标记状态。整体包在 IO：[ApkBuilder.pack] 是阻塞式实现（文件读写 +
+     * 签名），而 ViewModel 的 viewModelScope 跑在 Main——不包的话整个打包期
+     * 都在卡主线程。DAO 是 suspend 函数，切到 IO 后照常工作。
+     */
+    suspend fun buildPack(packId: Long, onProgress: PackProgress = { _, _, _ -> }): PackResult =
+        withContext(Dispatchers.IO) {
+            val request = prepareBuild(packId)
+            when (val result = apkBuilder.pack(request, onProgress)) {
+                is PackResult.Success -> {
+                    packDao.markPacked(packId, System.currentTimeMillis())
+                    // 只留最近 N 份产物（N 见设置页"产物保留版本数"）：重装/导出永远
+                    // 用最新那份，旧的纯占空间
+                    fileStore.pruneArtifacts(packId, appSettings.keepArtifacts)
+                    result
+                }
+                is PackResult.Failure -> result
             }
-            is PackResult.Failure -> result
         }
-    }
 
     // ---- 图标编辑（FR-05） ----
 

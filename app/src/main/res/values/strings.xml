@@ -35,7 +35,7 @@
     <string name="settings_keep_artifacts">产物保留版本数</string>
     <string name="settings_keep_artifacts_desc">打包成功后只保留最近几份产物 APK，更早的自动清理；已安装的应用不受影响，项目数据也原样保留。</string>
     <string name="settings_import_quality">导入压缩档位</string>
-    <string name="settings_import_quality_desc">导入图片时自动缩放与重编码：档位只影响之后的导入，已落盘的图片不追溯（可用设置里的"存量压缩"追平）。</string>
+    <string name="settings_import_quality_desc">导入图片时自动缩放与重编码：档位只影响之后的导入，已落盘的图片会在应用启动时后台自动按当前档位追平。</string>
     <string name="import_quality_high">高画质</string>
     <string name="import_quality_balanced">均衡</string>
     <string name="import_quality_compact">体积优先</string>

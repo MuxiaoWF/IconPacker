@@ -35,7 +35,7 @@
     <string name="settings_keep_artifacts">Artifacts to keep</string>
     <string name="settings_keep_artifacts_desc">After a successful pack, only the newest artifact APKs are kept and older ones are pruned automatically. Installed apps and project data are unaffected.</string>
     <string name="settings_import_quality">Import compression</string>
-    <string name="settings_import_quality_desc">Imported images are scaled and re-encoded automatically. The preset only affects future imports; existing files stay as they are (use "compress existing" to catch up).</string>
+    <string name="settings_import_quality_desc">Imported images are scaled and re-encoded automatically. The preset only affects future imports; existing files are caught up in the background at app start using the current preset.</string>
     <string name="import_quality_high">High quality</string>
     <string name="import_quality_balanced">Balanced</string>
     <string name="import_quality_compact">Compact</string>
