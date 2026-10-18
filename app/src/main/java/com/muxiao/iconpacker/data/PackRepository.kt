@@ -726,6 +726,17 @@ class PackRepository(
     /** 私有目录占用（图标池 + 产物），列表概览用 */
     suspend fun storageUsage(): StorageUsage = fileStore.storageUsage()
 
+    /** 项目全部产物，版本号新 → 旧（产物历史页） */
+    suspend fun artifactHistory(packId: Long): List<ArtifactInfo> = withContext(Dispatchers.IO) {
+        fileStore.artifactHistory(packId)
+    }
+
+    /** 导出指定产物文件（历史页允许导出旧版本） */
+    suspend fun exportArtifact(source: File, target: Uri): Long = fileStore.exportArtifact(source, target)
+
+    /** 删除单个产物文件；返回是否删除成功 */
+    suspend fun deleteArtifact(file: File): Boolean = fileStore.deleteArtifact(file)
+
     /** 导出最新产物到用户选定 Uri；返回写入字节数 */
     suspend fun exportLatestArtifact(packId: Long, target: Uri): Long {
         val artifact = fileStore.latestArtifact(packId)

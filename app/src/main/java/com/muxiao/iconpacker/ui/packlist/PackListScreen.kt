@@ -82,6 +82,7 @@ import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.data.IconFileStore
+import com.muxiao.iconpacker.data.ArtifactInfo
 import com.muxiao.iconpacker.data.PackEntity
 import com.muxiao.iconpacker.data.toSignConfig
 import com.muxiao.iconpacker.domain.PackVersionRules
@@ -106,6 +107,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 /**
@@ -131,6 +134,9 @@ fun PackListScreen(
     var waitingForSystemUi by remember { mutableStateOf(false) }
     var sortMenuOpen by remember { mutableStateOf(false) }
     var pendingUninstall by remember { mutableStateOf<PackEntity?>(null) }
+    // 产物历史对话框与其中的单文件导出
+    var historyFor by remember { mutableStateOf<PackEntity?>(null) }
+    var pendingHistoryExport by remember { mutableStateOf<File?>(null) }
     val bulkScope = rememberCoroutineScope()
 
     // 新建：表单整体提升到 Screen（对话框只负责呈现与提交），启动器图标与
@@ -352,6 +358,15 @@ fun PackListScreen(
         val pack = pendingBackupExport
         if (uri != null && pack != null) viewModel.exportProjectBackup(pack, uri)
         pendingBackupExport = null
+    }
+
+    // 产物历史里的单文件导出：文件名直接用产物原名（pack-v<N>.apk）
+    val historyExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/vnd.android.package-archive"),
+    ) { uri ->
+        val file = pendingHistoryExport
+        if (uri != null && file != null) viewModel.exportArtifactFile(file, uri)
+        pendingHistoryExport = null
     }
 
     // 导入项目备份 ZIP（v8）：完成即跳转新项目的映射工作台
@@ -580,6 +595,7 @@ fun PackListScreen(
                         },
                         onDuplicate = { viewModel.duplicatePack(pack) },
                         onExport = { pendingExport = pack },
+                        onHistory = { historyFor = pack },
                         onUninstall = { requestUninstall(pack) },
                         onExportBackup = { pendingBackupExport = pack },
                         onDelete = { pendingDelete = pack },
@@ -684,6 +700,36 @@ fun PackListScreen(
                 TextButton(onClick = { pendingUninstall = null }) {
                     Text(stringResource(R.string.common_cancel))
                 }
+            },
+        )
+    }
+
+    // 产物历史：列出保留的各版本产物，支持重装/导出/删除单版本
+    historyFor?.let { pack ->
+        ArtifactHistoryDialog(
+            installedVersion = state.installedVersions[pack.packageName],
+            onDismiss = { historyFor = null },
+            onLoad = { onLoaded ->
+                bulkScope.launch { onLoaded(viewModel.artifactHistory(pack.id)) }
+            },
+            onReinstall = { artifact ->
+                if (!InstallHelper.canInstallPackages(context)) {
+                    viewModel.postMessage(UiText(R.string.msg_build_unknown_sources_manual))
+                } else {
+                    runCatching {
+                        context.startActivity(InstallHelper.installIntent(context, artifact.file))
+                    }.onFailure {
+                        viewModel.postMessage(UiText(R.string.msg_build_unknown_sources_manual))
+                    }
+                }
+            },
+            onExport = { artifact ->
+                pendingHistoryExport = artifact.file
+                historyExportLauncher.launch(artifact.file.name)
+            },
+            onDelete = { artifact ->
+                viewModel.deleteArtifactFile(artifact.file)
+                viewModel.postMessage(UiText(R.string.history_deleted, artifact.versionCode))
             },
         )
     }
@@ -843,6 +889,7 @@ private fun PackItem(
     onEdit: () -> Unit,
     onDuplicate: () -> Unit,
     onExport: () -> Unit,
+    onHistory: () -> Unit,
     onUninstall: () -> Unit,
     onExportBackup: () -> Unit,
     onDelete: () -> Unit,
@@ -964,6 +1011,14 @@ private fun PackItem(
                             onClick = {
                                 menuExpanded = false
                                 onExport()
+                            },
+                            enabled = pack.lastPackedAt != null,
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.menu_artifact_history)) },
+                            onClick = {
+                                menuExpanded = false
+                                onHistory()
                             },
                             enabled = pack.lastPackedAt != null,
                         )
@@ -1306,3 +1361,91 @@ private fun formatBytes(bytes: Long): String {
         else -> "$bytes B"
     }
 }
+
+/**
+ * 产物历史对话框：列出保留的各版本产物（新 → 旧）。
+ *
+ * 重装对"低于已装版本"的产物禁用——系统拒绝降级覆盖安装，按钮亮着只会
+ * 让用户在安装器里撞一次失败。
+ */
+@Composable
+private fun ArtifactHistoryDialog(
+    installedVersion: Long?,
+    onDismiss: () -> Unit,
+    onLoad: (onLoaded: (List<ArtifactInfo>) -> Unit) -> Unit,
+    onReinstall: (ArtifactInfo) -> Unit,
+    onExport: (ArtifactInfo) -> Unit,
+    onDelete: (ArtifactInfo) -> Unit,
+) {
+    var artifacts by remember { mutableStateOf<List<ArtifactInfo>?>(null) }
+    LaunchedEffect(Unit) { onLoad { artifacts = it } }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.history_title)) },
+        text = {
+            when (val list = artifacts) {
+                null -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(Spacing.md),
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(IconSize.progressSmall))
+                    }
+                }
+
+                else -> if (list.isEmpty()) {
+                    Text(stringResource(R.string.history_empty))
+                } else {
+                    Column(
+                        modifier = Modifier.verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        list.forEach { artifact ->
+                            val canInstallNow = installedVersion == null ||
+                                artifact.versionCode >= installedVersion
+                            Column {
+                                Text(
+                                    text = stringResource(
+                                        R.string.history_entry,
+                                        artifact.versionCode,
+                                        formatBytes(artifact.sizeBytes),
+                                        formatDate(artifact.lastModified),
+                                    ),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                if (!canInstallNow) {
+                                    Text(
+                                        text = stringResource(R.string.history_downgrade_hint),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Row {
+                                    TextButton(onClick = { onReinstall(artifact) }, enabled = canInstallNow) {
+                                        Text(stringResource(R.string.history_reinstall))
+                                    }
+                                    TextButton(onClick = { onExport(artifact) }) {
+                                        Text(stringResource(R.string.history_export))
+                                    }
+                                    TextButton(onClick = { onDelete(artifact) }) {
+                                        Text(
+                                            stringResource(R.string.history_delete),
+                                            color = MaterialTheme.colorScheme.error,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) }
+        },
+    )
+}
+
+/** 产物历史里的时间戳展示（本地时区，分钟精度足够） */
+private fun formatDate(timestamp: Long): String =
+    SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(timestamp))

@@ -34,6 +34,11 @@
     <string name="settings_default_version_name_hint">留空则用内置默认（1.0）</string>
     <string name="settings_keep_artifacts">产物保留版本数</string>
     <string name="settings_keep_artifacts_desc">打包成功后只保留最近几份产物 APK，更早的自动清理；已安装的应用不受影响，项目数据也原样保留。</string>
+    <string name="settings_import_quality">导入压缩档位</string>
+    <string name="settings_import_quality_desc">导入图片时自动缩放与重编码：档位只影响之后的导入，已落盘的图片不追溯（可用设置里的"存量压缩"追平）。</string>
+    <string name="import_quality_high">高画质</string>
+    <string name="import_quality_balanced">均衡</string>
+    <string name="import_quality_compact">体积优先</string>
     <string name="settings_default_signer_name">默认签名者名</string>
     <string name="settings_default_signer_name_hint">v1 签名条目使用的文件名；留空则用内置默认</string>
     <string name="settings_default_schemes">默认签名方案</string>
@@ -145,6 +150,7 @@
     <!-- ===== 通用菜单 ===== -->
     <string name="menu_edit_pack">编辑名称与图标</string>
     <string name="menu_export_artifact">导出产物</string>
+    <string name="menu_artifact_history">产物历史</string>
     <string name="menu_uninstall_pack">卸载图标包</string>
     <string name="menu_duplicate">复制项目</string>
     <string name="menu_export_backup">导出项目备份（ZIP，不含密钥库）</string>
@@ -154,6 +160,21 @@
     <string name="msg_keystore_read_failed">无法读取密钥库文件：%1$s</string>
     <string name="msg_icon_read_failed">无法读取所选图片，请换一张试试</string>
     <string name="msg_uninstall_unavailable">没有可用的卸载界面，请在系统设置中卸载该图标包</string>
+    <string name="build_report_title">产物体检</string>
+    <string name="check_apk_readable">产物可读取</string>
+    <string name="check_manifest_present">清单文件存在</string>
+    <string name="check_arsc_present">资源表存在</string>
+    <string name="check_appfilter_valid">appfilter 映射有效</string>
+    <string name="check_icon_density">图标目录带密度限定符</string>
+    <string name="mapping_broken_warn">有 %1$d 条映射缺活动类名且目标未安装，打包后会被启动器整条丢弃，可在列表中修复或移除。</string>
+    <string name="history_title">产物历史</string>
+    <string name="history_empty">该项目还没有产物</string>
+    <string name="history_entry">v%1$d · %2$s · %3$s</string>
+    <string name="history_reinstall">重装</string>
+    <string name="history_export">导出</string>
+    <string name="history_delete">删除</string>
+    <string name="history_deleted">已删除产物 v%1$d</string>
+    <string name="history_downgrade_hint">低于设备上已安装的版本，无法覆盖安装</string>
     <string name="msg_pack_created_icon_failed">已创建图标包，但图标设置失败：%1$s</string>
     <string name="msg_create_failed">创建失败：%1$s</string>
     <string name="msg_sign_config_updated">签名配置已更新</string>

@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -105,6 +106,14 @@ class MappingViewModel(
     private val messageFlow = MutableStateFlow<List<UiText>?>(null)
     private val importingFlow = MutableStateFlow(false)
     private val unmappedOnlyFlow = MutableStateFlow(false)
+
+    /**
+     * 残缺映射数：缺活动类名且目标未安装的条目——标准启动器会整条丢弃，
+     * 桌面表现为"图标包没有任何可以替换的图标"。头部卡按此预警。
+     */
+    val brokenCount: StateFlow<Int> = repository.observeMappings(packId)
+        .map { repository.incompleteMappingCount(packId) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     /** 搜索行下方控件共用的小状态包 */
     private data class ListControls(

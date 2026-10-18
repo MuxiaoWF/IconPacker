@@ -159,6 +159,7 @@ fun MappingScreen(
     viewModel: MappingViewModel = viewModel(factory = MappingViewModel.factory(packId)),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val brokenCount by viewModel.brokenCount.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var pickingApp by remember { mutableStateOf<AssignTarget?>(null) }
@@ -311,6 +312,7 @@ fun MappingScreen(
                     appsCount = state.apps.size,
                     mappedCount = state.mappedCount,
                     iconsCount = state.icons.size,
+                    brokenCount = brokenCount,
                     importing = state.importing,
                     onImportAlbum = {
                         photoPicker.launch(
@@ -729,6 +731,7 @@ private fun MappingHeaderCard(
     appsCount: Int,
     mappedCount: Int,
     iconsCount: Int,
+    brokenCount: Int,
     importing: Boolean,
     onImportAlbum: () -> Unit,
     onImportZip: () -> Unit,
@@ -757,6 +760,16 @@ private fun MappingHeaderCard(
             )
         }
         Spacer(modifier = Modifier.size(Spacing.md))
+        // 残缺预警提前到映射页：这些映射在打包页也会被告警，但那时用户已经
+        // 离开了"能立刻改"的上下文；在这里看见就能顺手处理
+        if (brokenCount > 0) {
+            Text(
+                text = stringResource(R.string.mapping_broken_warn, brokenCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Spacer(modifier = Modifier.size(Spacing.sm))
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),

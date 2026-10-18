@@ -34,6 +34,11 @@
     <string name="settings_default_version_name_hint">Leave blank to use the built-in default (1.0)</string>
     <string name="settings_keep_artifacts">Artifacts to keep</string>
     <string name="settings_keep_artifacts_desc">After a successful pack, only the newest artifact APKs are kept and older ones are pruned automatically. Installed apps and project data are unaffected.</string>
+    <string name="settings_import_quality">Import compression</string>
+    <string name="settings_import_quality_desc">Imported images are scaled and re-encoded automatically. The preset only affects future imports; existing files stay as they are (use "compress existing" to catch up).</string>
+    <string name="import_quality_high">High quality</string>
+    <string name="import_quality_balanced">Balanced</string>
+    <string name="import_quality_compact">Compact</string>
     <string name="settings_default_signer_name">Default signer name</string>
     <string name="settings_default_signer_name_hint">File name used by the v1 signing entry; leave blank for the built-in default</string>
     <string name="settings_default_schemes">Default signing schemes</string>
@@ -145,6 +150,7 @@
     <!-- ===== Context menus ===== -->
     <string name="menu_edit_pack">Edit name &amp; icon</string>
     <string name="menu_export_artifact">Export artifact</string>
+    <string name="menu_artifact_history">Artifact history</string>
     <string name="menu_uninstall_pack">Uninstall icon pack</string>
     <string name="menu_duplicate">Duplicate project</string>
     <string name="menu_export_backup">Export project backup (ZIP, no keystore)</string>
@@ -154,6 +160,21 @@
     <string name="msg_keystore_read_failed">Couldn\'t read the keystore file: %1$s</string>
     <string name="msg_icon_read_failed">Couldn\'t read the selected image. Try another one.</string>
     <string name="msg_uninstall_unavailable">No uninstaller is available here; uninstall the icon pack from system settings.</string>
+    <string name="build_report_title">Artifact self-check</string>
+    <string name="check_apk_readable">Artifact readable</string>
+    <string name="check_manifest_present">Manifest present</string>
+    <string name="check_arsc_present">Resource table present</string>
+    <string name="check_appfilter_valid">appfilter mapping valid</string>
+    <string name="check_icon_density">Icon entries use density-qualified dirs</string>
+    <string name="mapping_broken_warn">%1$d mappings lack an activity class and their targets are not installed; launchers will drop them when packing. Fix or remove them in the list.</string>
+    <string name="history_title">Artifact history</string>
+    <string name="history_empty">This project has no artifacts yet</string>
+    <string name="history_entry">v%1$d · %2$s · %3$s</string>
+    <string name="history_reinstall">Reinstall</string>
+    <string name="history_export">Export</string>
+    <string name="history_delete">Delete</string>
+    <string name="history_deleted">Artifact v%1$d deleted</string>
+    <string name="history_downgrade_hint">Lower than the installed version; cannot be installed over it</string>
     <string name="msg_pack_created_icon_failed">The icon pack was created, but setting its icon failed: %1$s</string>
     <string name="msg_create_failed">Creation failed: %1$s</string>
     <string name="msg_sign_config_updated">Signing configuration updated</string>

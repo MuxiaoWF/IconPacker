@@ -43,10 +43,25 @@ data class StorageUsage(val iconsBytes: Long, val outputsBytes: Long) {
     val totalBytes: Long get() = iconsBytes + outputsBytes
 }
 
+/** 产物历史页的一行：版本号 + 对应文件 */
+data class ArtifactInfo(
+    val versionCode: Long,
+    val file: File,
+) {
+    val sizeBytes: Long get() = file.length()
+    val lastModified: Long get() = file.lastModified()
+}
+
 class IconFileStore(
     private val context: Context,
-    private val importCompressor: ImportCompressor = ImportCompressor(),
+    /**
+     * 压缩器按需取用而不是构造时固定：导入压缩档位是设置项，用户切档后
+     * 下一次导入必须立即生效（单例 fileStore 不会重建）。
+     */
+    private val importCompressorProvider: () -> ImportCompressor = { ImportCompressor() },
 ) {
+
+    private val importCompressor: ImportCompressor get() = importCompressorProvider()
 
     private val filesRoot: File get() = context.filesDir
 
@@ -79,6 +94,20 @@ class IconFileStore(
         outputDir(packId)
             .listFiles { file -> file.name.startsWith("pack-v") && file.name.endsWith(".apk") }
             ?.maxByOrNull { versionCodeOfArtifact(it.name) }
+
+    /**
+     * 项目全部产物，按版本号新 → 旧排列（产物历史页用）。
+     * 与 [latestArtifact] 的解析规则一致：按版本号数字比较，不按文件名字符串。
+     */
+    fun artifactHistory(packId: Long): List<ArtifactInfo> =
+        outputDir(packId)
+            .listFiles { file -> file.name.startsWith("pack-v") && file.name.endsWith(".apk") }
+            ?.map { ArtifactInfo(versionCodeOfArtifact(it.name), it) }
+            ?.sortedByDescending { it.versionCode }
+            ?: emptyList()
+
+    /** 删除单个产物文件（产物历史页的手动清理入口） */
+    suspend fun deleteArtifact(file: File): Boolean = withContext(Dispatchers.IO) { file.delete() }
 
     /** 从 `pack-v<N>.apk` 解析版本号；解析不出返回 0 */
     private fun versionCodeOfArtifact(fileName: String): Long =

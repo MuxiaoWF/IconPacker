@@ -9,6 +9,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.muxiao.iconpacker.ServiceLocator
 import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.data.AppSettings
+import com.muxiao.iconpacker.data.ArtifactInfo
 import com.muxiao.iconpacker.data.InstalledPackChecker
 import com.muxiao.iconpacker.data.PackEntity
 import com.muxiao.iconpacker.data.PackRepository
@@ -268,6 +269,28 @@ class PackListViewModel(
 
     /** 最新产物文件（列表内直接安装用）；无产物时为 null */
     suspend fun latestArtifact(packId: Long): File? = repository.latestArtifactOf(packId)
+
+    /** 产物历史（版本号新 → 旧），产物历史对话框用 */
+    suspend fun artifactHistory(packId: Long): List<ArtifactInfo> = repository.artifactHistory(packId)
+
+    /** 导出指定产物文件（历史页可导出旧版本） */
+    fun exportArtifactFile(file: File, target: Uri) {
+        viewModelScope.launch {
+            val message = runCatching { repository.exportArtifact(file, target) }.fold(
+                onSuccess = { UiText(R.string.msg_exported, it / 1024) },
+                onFailure = { it.uiMessage(R.string.msg_export_failed) },
+            )
+            postMessage(message)
+        }
+    }
+
+    /** 删除单个产物文件后重查（可能影响"可安装"状态） */
+    fun deleteArtifactFile(file: File) {
+        viewModelScope.launch {
+            repository.deleteArtifact(file)
+            refreshInstalled()
+        }
+    }
 
     /**
      * 新建图标包（完整表单版，FR-02）。

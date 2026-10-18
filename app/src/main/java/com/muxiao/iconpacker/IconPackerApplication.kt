@@ -3,6 +3,7 @@ package com.muxiao.iconpacker
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
+import com.muxiao.iconpacker.core.packer.engine.ImportCompressor
 import com.muxiao.iconpacker.data.AppInfoProvider
 import com.muxiao.iconpacker.data.AppSettings
 import com.muxiao.iconpacker.data.IconFileStore
@@ -43,9 +44,15 @@ object ServiceLocator {
         // 只锁存 Application 上下文，杜绝把 Activity/View 等短生命周期上下文存进静态单例
         val appContext = context.applicationContext
         val db = IconPackerDatabase.build(appContext)
-        val fileStore = IconFileStore(appContext)
-        // settings 必须先于 repository：打包后的产物裁剪按设置里的保留数执行
+        // settings 最先：fileStore 的压缩档位、repository 的产物裁剪数都读它
         settings = AppSettings(appContext)
+        val fileStore = IconFileStore(appContext, importCompressorProvider = {
+            val quality = settings.importQuality
+            ImportCompressor(
+                maxLongSide = quality.maxLongSide,
+                keepUnderBytes = quality.keepUnderBytes,
+            )
+        })
         repository = PackRepository(
             packDao = db.packDao(),
             mappingDao = db.mappingDao(),

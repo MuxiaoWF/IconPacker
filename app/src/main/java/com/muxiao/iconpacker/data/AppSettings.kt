@@ -56,12 +56,17 @@ class AppSettings(context: Context) {
          * 只影响私有目录占用，不触碰已安装的应用。
          */
         val keepArtifacts: Int = IconFileStore.DEFAULT_KEEP_ARTIFACTS,
+        /** 导入压缩档位：只影响之后的导入，已落盘的图片不追溯 */
+        val importQuality: ImportQuality = ImportQuality.BALANCED,
     )
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     /** 当前产物保留数（仓库层打包后裁剪用，免得持流取值） */
     val keepArtifacts: Int get() = state.value.keepArtifacts
+
+    /** 当前导入压缩档位（fileStore 的压缩器提供者用） */
+    val importQuality: ImportQuality get() = state.value.importQuality
 
     private val _state = MutableStateFlow(read())
     val state: StateFlow<State> = _state.asStateFlow()
@@ -109,6 +114,9 @@ class AppSettings(context: Context) {
         it.putInt(KEY_KEEP_ARTIFACTS, value.coerceIn(MIN_KEEP_ARTIFACTS, MAX_KEEP_ARTIFACTS))
     }
 
+    /** 导入压缩档位 */
+    fun setImportQuality(value: ImportQuality) = edit { it.putString(KEY_IMPORT_QUALITY, value.name) }
+
     /** 清除默认签名身份：回到设备端生成密钥 */
     fun clearKeystore() = edit {
         it.putBoolean(KEY_IMPORTED_KEYSTORE, false)
@@ -136,6 +144,9 @@ class AppSettings(context: Context) {
         uninstallHintDismissed = prefs.getBoolean(KEY_UNINSTALL_HINT, false),
         keepArtifacts = prefs.getInt(KEY_KEEP_ARTIFACTS, IconFileStore.DEFAULT_KEEP_ARTIFACTS)
             .coerceIn(MIN_KEEP_ARTIFACTS, MAX_KEEP_ARTIFACTS),
+        importQuality = ImportQuality.entries.firstOrNull {
+            it.name == prefs.getString(KEY_IMPORT_QUALITY, null)
+        } ?: ImportQuality.BALANCED,
     )
 
     companion object {
@@ -167,6 +178,7 @@ class AppSettings(context: Context) {
         private const val KEY_KEYSTORE_ALIAS = "default_keystore_alias"
         private const val KEY_UNINSTALL_HINT = "uninstall_hint_dismissed"
         private const val KEY_KEEP_ARTIFACTS = "keep_artifacts"
+        private const val KEY_IMPORT_QUALITY = "import_quality"
 
         /** 产物保留数的合法区间（界面档位是其中的子集） */
         const val MIN_KEEP_ARTIFACTS = 1

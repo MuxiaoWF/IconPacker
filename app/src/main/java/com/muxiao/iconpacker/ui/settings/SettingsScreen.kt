@@ -38,6 +38,7 @@ import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.ServiceLocator
 import com.muxiao.iconpacker.data.AppSettings
 import com.muxiao.iconpacker.data.IconFileStore
+import com.muxiao.iconpacker.data.ImportQuality
 import com.muxiao.iconpacker.data.LocaleMode
 import com.muxiao.iconpacker.data.ThemeMode
 import com.muxiao.iconpacker.ui.components.AppChip
@@ -214,6 +215,36 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.size(Spacing.sm))
                 Text(
                     text = stringResource(R.string.settings_keep_artifacts_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.size(Spacing.md))
+                // 导入压缩档位：只影响之后的导入，已落盘的图片不追溯
+                Text(
+                    text = stringResource(R.string.settings_import_quality),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    ImportQuality.entries.forEach { quality ->
+                        AppChip(
+                            selected = state.importQuality == quality,
+                            label = stringResource(
+                                when (quality) {
+                                    ImportQuality.HIGH -> R.string.import_quality_high
+                                    ImportQuality.BALANCED -> R.string.import_quality_balanced
+                                    ImportQuality.COMPACT -> R.string.import_quality_compact
+                                },
+                            ),
+                            onClick = { settings.setImportQuality(quality) },
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.size(Spacing.sm))
+                Text(
+                    text = stringResource(R.string.settings_import_quality_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
