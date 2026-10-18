@@ -154,6 +154,7 @@
     <string name="menu_uninstall_pack">卸载图标包</string>
     <string name="menu_duplicate">复制项目</string>
     <string name="menu_export_backup">导出项目备份（ZIP，不含密钥库）</string>
+    <string name="menu_export_backup_with_apk">导出项目备份（含产物 APK，可换机直装）</string>
 
     <!-- ===== 消息（项目列表 VM） ===== -->
     <string name="msg_version_code_invalid">版本号必须是大于 0 的整数</string>
@@ -161,6 +162,10 @@
     <string name="msg_icon_read_failed">无法读取所选图片，请换一张试试</string>
     <string name="msg_uninstall_unavailable">没有可用的卸载界面，请在系统设置中卸载该图标包</string>
     <string name="build_report_title">产物体检</string>
+    <string name="build_guide_supported_title">当前启动器支持标准图标包</string>
+    <string name="build_guide_supported_body">安装本产物后，直接在启动器的桌面设置 → 图标样式中选择它即可生效。</string>
+    <string name="build_guide_unverified_title">能否直接应用需实测</string>
+    <string name="build_guide_unverified_body">当前启动器尚未确认能否应用第三方图标包：先在桌面设置的图标选项中尝试应用本产物；若没有该入口，再安装 Nova Launcher 或 Lawnchair。</string>
     <string name="check_apk_readable">产物可读取</string>
     <string name="check_manifest_present">清单文件存在</string>
     <string name="check_arsc_present">资源表存在</string>
@@ -174,6 +179,8 @@
     <string name="history_export">导出</string>
     <string name="history_delete">删除</string>
     <string name="history_deleted">已删除产物 v%1$d</string>
+    <string name="dialog_delete_artifact_title">删除产物 v%1$d？</string>
+    <string name="dialog_delete_artifact_body">只删除设备上这份 APK 文件：项目数据与图标池不受影响，需要时可随时重新打包生成。</string>
     <string name="history_downgrade_hint">低于设备上已安装的版本，无法覆盖安装</string>
     <string name="msg_pack_created_icon_failed">已创建图标包，但图标设置失败：%1$s</string>
     <string name="msg_create_failed">创建失败：%1$s</string>

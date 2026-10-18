@@ -58,10 +58,19 @@ object ArtifactInspector {
             val appfilterEntry = zip.getEntry("res/xml/appfilter.xml")
                 ?: entryNames.firstOrNull { it.endsWith("/appfilter.xml", true) }
                     ?.let { zip.getEntry(it) }
+            // 只探头部 8 字节而非整条读入：检查目标就是首字节的类型标记，
+            // 无上限读取与 readCapped 的防御风格相悖（条目名义上来自自家引擎，
+            // 但检查器不该假设这一点）
             val appfilterOk = appfilterEntry != null && zip.getInputStream(appfilterEntry).use { stream ->
-                val bytes = stream.readBytes()
+                val head = ByteArray(8)
+                var read = 0
+                while (read < head.size) {
+                    val n = stream.read(head, read, head.size - read)
+                    if (n <= 0) break
+                    read += n
+                }
                 // 合法二进制 AXML 首字节是 0x03（RES_XML_TYPE）；兼容明文 XML 的极少数包
-                bytes.size > 8 && (bytes[0] == 0x03.toByte() || bytes[0] == '<'.code.toByte())
+                read > 0 && (head[0] == 0x03.toByte() || head[0] == '<'.code.toByte())
             }
 
             val iconCount = entryNames.count { DENSITY_ICON_ENTRY.containsMatchIn(it) }

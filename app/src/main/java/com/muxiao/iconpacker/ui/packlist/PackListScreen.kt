@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -70,6 +71,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -137,6 +139,7 @@ fun PackListScreen(
     // 产物历史对话框与其中的单文件导出
     var historyFor by remember { mutableStateOf<PackEntity?>(null) }
     var pendingHistoryExport by remember { mutableStateOf<File?>(null) }
+    var pendingHistoryDelete by remember { mutableStateOf<ArtifactInfo?>(null) }
     val bulkScope = rememberCoroutineScope()
 
     // 新建：表单整体提升到 Screen（对话框只负责呈现与提交），启动器图标与
@@ -177,8 +180,7 @@ fun PackListScreen(
         val direct = runCatching {
             context.startActivity(InstallHelper.uninstallIntent(packageName))
         }.isSuccess
-        if (direct) return true
-        return runCatching {
+        return direct || runCatching {
             context.startActivity(InstallHelper.appDetailsIntent(packageName))
         }.isSuccess
     }
@@ -351,13 +353,17 @@ fun PackListScreen(
         pendingExport = null
     }
 
-    // 导出项目备份 ZIP（v8）
+    // 导出项目备份 ZIP（v8）；含产物 APK 时升级为 v2 完整备份
+    var pendingBackupIncludeArtifact by remember { mutableStateOf(false) }
     val backupExportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip"),
     ) { uri ->
         val pack = pendingBackupExport
-        if (uri != null && pack != null) viewModel.exportProjectBackup(pack, uri)
+        if (uri != null && pack != null) {
+            viewModel.exportProjectBackup(pack, uri, pendingBackupIncludeArtifact)
+        }
         pendingBackupExport = null
+        pendingBackupIncludeArtifact = false
     }
 
     // 产物历史里的单文件导出：文件名直接用产物原名（pack-v<N>.apk）
@@ -597,7 +603,8 @@ fun PackListScreen(
                         onExport = { pendingExport = pack },
                         onHistory = { historyFor = pack },
                         onUninstall = { requestUninstall(pack) },
-                        onExportBackup = { pendingBackupExport = pack },
+                        onExportBackup = { pendingBackupExport = pack; pendingBackupIncludeArtifact = false },
+                        onExportBackupWithApk = { pendingBackupExport = pack; pendingBackupIncludeArtifact = true },
                         onDelete = { pendingDelete = pack },
                     )
                 }
@@ -679,8 +686,19 @@ fun PackListScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     Text(stringResource(R.string.uninstall_hint_body))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = neverAsk, onCheckedChange = { neverAsk = it })
+                    // 勾选语义合并到整行：TalkBack 读成"不再提示，复选框，未勾选"，
+                    // 而不是孤立的复选框 + 孤立的文本；点击热区也扩大到整行
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .toggleable(
+                                value = neverAsk,
+                                role = Role.Checkbox,
+                                onValueChange = { neverAsk = it },
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(checked = neverAsk, onCheckedChange = null)
                         Text(stringResource(R.string.uninstall_hint_never))
                     }
                 }
@@ -728,8 +746,36 @@ fun PackListScreen(
                 historyExportLauncher.launch(artifact.file.name)
             },
             onDelete = { artifact ->
-                viewModel.deleteArtifactFile(artifact.file)
-                viewModel.postMessage(UiText(R.string.history_deleted, artifact.versionCode))
+                // 低风险但不无声：确认框讲清"只删这份文件，项目与重打包不受影响"
+                pendingHistoryDelete = artifact
+            },
+        )
+    }
+
+    // 产物删除确认：明确"只动这一份 APK"，避免用户担心连项目一起删掉而不敢用
+    pendingHistoryDelete?.let { artifact ->
+        AlertDialog(
+            onDismissRequest = { pendingHistoryDelete = null },
+            title = { Text(stringResource(R.string.dialog_delete_artifact_title, artifact.versionCode)) },
+            text = { Text(stringResource(R.string.dialog_delete_artifact_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteArtifactFile(artifact.file)
+                        viewModel.postMessage(UiText(R.string.history_deleted, artifact.versionCode))
+                        pendingHistoryDelete = null
+                    },
+                ) {
+                    Text(
+                        stringResource(R.string.common_delete),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingHistoryDelete = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
             },
         )
     }
@@ -892,6 +938,7 @@ private fun PackItem(
     onHistory: () -> Unit,
     onUninstall: () -> Unit,
     onExportBackup: () -> Unit,
+    onExportBackupWithApk: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val palette = LocalAppPalette.current
@@ -1046,6 +1093,14 @@ private fun PackItem(
                                 menuExpanded = false
                                 onExportBackup()
                             },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.menu_export_backup_with_apk)) },
+                            onClick = {
+                                menuExpanded = false
+                                onExportBackupWithApk()
+                            },
+                            enabled = pack.lastPackedAt != null,
                         )
                         DropdownMenuItem(
                             text = {

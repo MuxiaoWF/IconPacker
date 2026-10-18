@@ -101,7 +101,7 @@ data class PackListUiState(
                 PackSort.RECENT -> filtered
                 PackSort.NAME -> filtered.sortedBy { it.name.lowercase() }
                 PackSort.INSTALLED -> filtered.sortedWith(
-                    compareBy<PackEntity>(
+                    compareBy(
                         { it.packageName !in installedVersions },
                         { -it.updatedAt },
                     ),
@@ -133,6 +133,12 @@ class PackListViewModel(
      * 单靠数据库的 Flow 察觉不到，必须由一个显式信号驱动重查。
      */
     private val refreshTrigger = MutableStateFlow(0)
+
+    /**
+     * 三条设备侧查询（安装状态 / 产物存在性 / 占用）共用的上游：
+     * packs 表变更或手动刷新任一发生即重放，语义单点、改口径只改这里。
+     */
+    private val refreshPacksFlow = combine(packsFlow, refreshTrigger) { packs, _ -> packs }
 
     private val exportingFlow = MutableStateFlow<Long?>(null)
     private val messageFlow = MutableStateFlow<UiText?>(null)
@@ -179,30 +185,24 @@ class PackListViewModel(
 
     /** 逐项目查询安装状态；PackageManager 调用不能占主线程 */
     private val installedFlow: Flow<Map<String, Long>> =
-        combine(packsFlow, refreshTrigger) { packs, _ -> packs }
-            .map { packs ->
-                packs.mapNotNull { pack ->
-                    installedPackChecker.query(pack.packageName)
-                        ?.let { pack.packageName to it.versionCode }
-                }.toMap()
-            }
-            .flowOn(Dispatchers.IO)
+        refreshPacksFlow.map { packs ->
+            packs.mapNotNull { pack ->
+                installedPackChecker.query(pack.packageName)
+                    ?.let { pack.packageName to it.versionCode }
+            }.toMap()
+        }.flowOn(Dispatchers.IO)
 
     /** 磁盘上是否还有该项目的产物（有就能直接安装/更新，不必重新打包） */
     private val installableFlow: Flow<Set<Long>> =
-        combine(packsFlow, refreshTrigger) { packs, _ -> packs }
-            .map { packs ->
-                packs.mapNotNull { pack ->
-                    pack.id.takeIf { repository.latestArtifactOf(it) != null }
-                }.toSet()
-            }
-            .flowOn(Dispatchers.IO)
+        refreshPacksFlow.map { packs ->
+            packs.mapNotNull { pack ->
+                pack.id.takeIf { repository.latestArtifactOf(it) != null }
+            }.toSet()
+        }.flowOn(Dispatchers.IO)
 
     /** 私有目录占用：随项目变更与刷新信号重算（几百次 stat，代价可忽略） */
     private val usageFlow: Flow<StorageUsage?> =
-        combine(packsFlow, refreshTrigger) { packs, _ -> packs }
-            .map { repository.storageUsage() }
-            .flowOn(Dispatchers.IO)
+        refreshPacksFlow.map { repository.storageUsage() }.flowOn(Dispatchers.IO)
 
     private val deviceFlow = combine(installedFlow, installableFlow, usageFlow) { installed, installable, usage ->
         DeviceState(installed, installable, usage)
@@ -486,10 +486,12 @@ class PackListViewModel(
     }
 
     /** 导出项目备份 ZIP（配置 + 图标池 + 映射；密钥库文件与密码不随包走） */
-    fun exportProjectBackup(pack: PackEntity, uri: Uri) {
+    /** 导出项目备份 ZIP；[includeArtifact] 升级为 v2 完整备份（最新产物随包，换机免重打） */
+    fun exportProjectBackup(pack: PackEntity, uri: Uri, includeArtifact: Boolean = false) {
         viewModelScope.launch {
             backupBusyFlow.value = pack.id
-            val result = runCatching { ServiceLocator.projectBackup.exportProject(pack.id, uri) }
+            val result =
+                runCatching { ServiceLocator.projectBackup.exportProject(pack.id, uri, includeArtifact) }
             backupBusyFlow.value = null
             messageFlow.value = result.fold(
                 onSuccess = { UiText(R.string.msg_backup_exported, it / 1024) },

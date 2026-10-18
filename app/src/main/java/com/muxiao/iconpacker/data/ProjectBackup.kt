@@ -19,13 +19,16 @@ import org.json.JSONObject
  * 备份 ZIP 是把"配置 + 图标文件"作为一个原子单元搬走/搬回的唯一通道——两个通道
  * 各自搬一半（只导图标不导映射，或只导配置不导图标）都要用户手工拼，必错。
  *
- * ZIP 布局（`formatVersion=1`）：
+ * ZIP 布局：
  * ```
  * project.json            项目元数据（pack 字段 + assets 清单 + mappings）
  * pack_icon.png           图标包自身启动器图标（未设置时无此条目）
  * icons/<slot>/source.ext 原图（按磁盘上的真实扩展名）
  * icons/<slot>/edited.webp 编辑产物（仅编辑过该槽位时存在）
+ * artifact.apk            最新产物 APK（仅 v2「完整备份」携带；密钥库仍不随包）
  * ```
+ * `formatVersion=1` 数据备份 / `formatVersion=2` 完整备份（多了 artifact.apk）。
+ * 导入同时接受两版：v2 且条目存在时按 project.json 里的 versionCode 还原产物。
  *
  * 边界（隐私与安全）：
  * - **密钥库文件与密码不进 ZIP**。密钥库是跨项目共享资产且含密码；导出的
@@ -44,9 +47,24 @@ class ProjectBackup(
     private val context: Context,
 ) {
 
-    /** 导出项目到用户选定 Uri；返回写入字节数 */
-    suspend fun exportProject(packId: Long, target: Uri): Long = withContext(Dispatchers.IO) {
+    /**
+     * 导出项目到用户选定 Uri；返回写入字节数。
+     *
+     * [includeArtifact] 为 true 时升级为 v2 完整备份：最新产物 APK 随包走，
+     * 换机后可直装、免重打。产物不存在（从未打包/已被裁剪）时直接报错——
+     * 用户明确要求"带产物"却拿不到，静默降级成数据备份会让他误以为备份是完整的。
+     */
+    suspend fun exportProject(
+        packId: Long,
+        target: Uri,
+        includeArtifact: Boolean = false,
+    ): Long = withContext(Dispatchers.IO) {
         val pack = packDao.getById(packId) ?: error("项目不存在：$packId")
+        val artifact = if (includeArtifact) {
+            fileStore.latestArtifact(packId) ?: error("该项目还没有产物，无法完整备份")
+        } else {
+            null
+        }
         val assets = assetDao.getByPack(packId)
         val mappings = mappingDao.getByPack(packId)
 
@@ -73,7 +91,7 @@ class ProjectBackup(
                     .put("minSdkOverride", pack.minSdkOverride)
                     .put("targetSdkOverride", pack.targetSdkOverride)
                 val json = JSONObject()
-                    .put(FORMAT_VERSION, 1)
+                    .put(FORMAT_VERSION, if (artifact != null) FORMAT_VERSION_FULL else FORMAT_VERSION_DATA)
                     .put("pack", packJson)
                 val assetsJson = JSONArray()
                 assets.forEach { asset ->
@@ -113,6 +131,16 @@ class ProjectBackup(
                 pack.iconPath?.takeIf { File(it).isFile }?.let { path ->
                     zip.putNextEntry(ZipEntry("pack_icon.png"))
                     File(path).inputStream().buffered(IO_BUFFER).use { input ->
+                        input.copyTo(zip, IO_BUFFER).also { written += it }
+                    }
+                    zip.closeEntry()
+                }
+
+                // v2 完整备份：产物固定名 artifact.apk，版本号已在 project.json 里，
+                // 导入时按它还原成 pack-v<N>.apk（不猜测条目名、不做路径拼接）
+                artifact?.let { apk ->
+                    zip.putNextEntry(ZipEntry(ARTIFACT_ENTRY))
+                    apk.inputStream().buffered(IO_BUFFER).use { input ->
                         input.copyTo(zip, IO_BUFFER).also { written += it }
                     }
                     zip.closeEntry()
@@ -157,7 +185,9 @@ class ProjectBackup(
                 ).readBytes().toString(Charsets.UTF_8)
                 val json = JSONObject(jsonText)
                 val version = json.optInt(FORMAT_VERSION, -1)
-                require(version == 1) { "备份版本不支持（formatVersion=$version）" }
+                require(version in FORMAT_VERSION_DATA..FORMAT_VERSION_FULL) {
+                    "备份版本不支持（formatVersion=$version）"
+                }
 
                 val packJson = json.getJSONObject("pack")
                 val now = System.currentTimeMillis()
@@ -185,6 +215,12 @@ class ProjectBackup(
                 val newId = packDao.insertWithPackage(basePack, now, customName)
 
                 copyPackIcon(zip, newId, now)
+
+                // v2 完整备份：把随包产物按备份里的版本号还原到新项目的 outputs，
+                // 使其直接出现在产物历史里（重装/导出不必重新打包）
+                if (version >= FORMAT_VERSION_FULL) {
+                    restoreArtifact(zip, newId, basePack.versionCode)
+                }
 
                 // 逐条 insertAll 等于"每个图标一次事务"，300 张图标就是 300 次磁盘提交——
                 // 这是备份导入慢的另一半原因。先攒成一批，收尾各写一次。
@@ -240,6 +276,15 @@ class ProjectBackup(
         packDao.setIcon(newId, target.absolutePath, now)
     }
 
+    /** v2：还原随包产物到新项目的私有目录（命名与打包产物一致：pack-v&lt;N&gt;.apk） */
+    private fun restoreArtifact(zip: ZipFile, newId: Long, versionCode: Int) {
+        val entry = zip.getEntry(ARTIFACT_ENTRY) ?: return
+        val target = fileStore.outputApk(newId, versionCode)
+        target.outputStream().buffered(IO_BUFFER).use { output ->
+            zip.getInputStream(entry).use { input -> input.copyTo(output, IO_BUFFER) }
+        }
+    }
+
     /** 解包一条目到目录（落盘名 `<slot>__0__<basename>`），返回新路径；条目缺失返回 null */
     private fun unzipTo(zip: ZipFile, entryName: String, slot: Int, destDir: File): String? {
         val entry = zip.getEntry(entryName) ?: return null
@@ -265,6 +310,13 @@ class ProjectBackup(
         private const val FORMAT_VERSION = "formatVersion"
         private const val JSON_ENTRY = "project.json"
         private const val PACK_ICON_ENTRY = "pack_icon.png"
+        private const val ARTIFACT_ENTRY = "artifact.apk"
+
+        /** v1：数据备份（配置 + 图标池 + 映射） */
+        const val FORMAT_VERSION_DATA = 1
+
+        /** v2：完整备份（额外携带最新产物 APK） */
+        const val FORMAT_VERSION_FULL = 2
 
         /** ZIP 条目搬运缓冲区：默认 8KB 在几百张图标时会多出几十万次小读 */
         private const val IO_BUFFER = 64 * 1024

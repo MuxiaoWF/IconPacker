@@ -35,7 +35,7 @@ import java.util.zip.ZipInputStream
  * 详见 [ImportCompressor]。
  *
  * **ZIP 解析**：保留条目原始路径、合并多密度副本、顺带取出包内 appfilter（见
- * [extractZipImages]）。这三件事是"导入即建立映射"的前提——路径与 appfilter 都携带
+ * extractZipImages）。这三件事是"导入即建立映射"的前提——路径与 appfilter 都携带
  * 映射所需的信息，丢了就只能靠文件名猜。
  */
 /**
