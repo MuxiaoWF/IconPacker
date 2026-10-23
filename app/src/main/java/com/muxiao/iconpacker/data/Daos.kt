@@ -208,6 +208,20 @@ interface IconAssetDao {
     @Query("UPDATE icon_assets SET sourcePath = :path WHERE packId = :packId AND slot = :slot")
     suspend fun updateSource(packId: Long, slot: Int, path: String)
 
+    /**
+     * 重复导入时把新文件换到既有槽位上（槽位不动，映射因此原样保留）。
+     *
+     * `editedPath` 必须一并清空：编辑产物是按**旧原图**合成的，原图换了还留着它，
+     * 打包会继续用旧编辑（"更新了却看不到变化"）。调用方负责删除那个产物文件。
+     * `originalName` 同步成新批次的匹配键——同名更新通常一致，但大小写/扩展名
+     * 可能不同，留旧值会让下一次的合并判定漂移。
+     */
+    @Query(
+        "UPDATE icon_assets SET sourcePath = :path, originalName = :name, editedPath = NULL " +
+            "WHERE packId = :packId AND slot = :slot",
+    )
+    suspend fun replaceSource(packId: Long, slot: Int, path: String, name: String)
+
     @Insert
     suspend fun insertAll(assets: List<IconAssetEntity>): List<Long>
 

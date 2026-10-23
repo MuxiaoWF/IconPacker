@@ -290,6 +290,7 @@
     <string name="err_icon_missing">Icon not found: pack=%1$s slot=%2$d</string>
     <string name="err_no_artifact">Nothing to export — build the pack first</string>
     <string name="err_icons_pool_full">The icon pool is full (limit %1$d)</string>
+    <string name="err_zip_malformed">Could not read this ZIP: the file may be damaged or use an unsupported compression method</string>
 
     <!-- ===== Mapping workbench (FR-03/FR-04) ===== -->
     <string name="mapping_title_fallback">Mapping workbench</string>
@@ -320,6 +321,8 @@
     <string name="mapping_resolve_target">Will map to %1$s</string>
     <string name="mapping_target_not_installed">This app isn\'t installed: the mapping is written into the artifact first and calibrated to the real launch entry once the app is installed.</string>
     <string name="mapping_retarget_warn">After saving, this mapping will point to %1$s and %2$s will have no mapping.</string>
+    <string name="mapping_conflict_warn">This package name is already used by \"%1$s\"; continuing replaces it and that icon becomes unmapped</string>
+    <string name="mapping_conflict_warn_generic">This package name is already used by another icon; continuing replaces it and that icon becomes unmapped</string>
     <string name="mapping_next_step">Next</string>
     <string name="mapping_pick_app">Pick an app</string>
     <string name="common_search">Search</string>
@@ -356,9 +359,9 @@
     <string name="mapping_msg_separator">"; "</string>
     <string name="mapping_automap_sep">", "</string>
     <string name="msg_preset_activated">Preset icons enabled for %1$d newly installed apps</string>
-    <string name="msg_retarget_displaced">Mapping now points to %1$s (its previous mapping was replaced)</string>
+    <string name="msg_retarget_displaced">Mapping now points to %1$s (the icon \"%2$s\" it used before is now unmapped)</string>
     <string name="msg_retarget">Mapping now points to %1$s</string>
-    <string name="msg_reassign_icon">%1$s\'s mapping now points to this icon (its previous mapping was replaced)</string>
+    <string name="msg_reassign_icon">%1$s now uses this icon (the icon \"%2$s\" it used before is now unmapped)</string>
     <string name="msg_unassign">Cleared the icon mapping for %1$s</string>
     <string name="msg_automatch_added">Auto-matching added %1$d mappings</string>
     <string name="msg_automatch_none">No auto-matchable apps found</string>
@@ -383,6 +386,10 @@
     <string name="msg_import_merged">Merged %1$d multi-density duplicates</string>
     <string name="msg_import_skipped">Skipped %1$d non-image files</string>
     <string name="msg_import_truncated">%1$d more exceeded the slot limit and weren\'t imported</string>
+    <string name="msg_import_updated">%1$d existing icons updated</string>
+    <string name="msg_import_unchanged">%1$d icons match the pool and weren\'t duplicated</string>
+    <string name="msg_import_unchanged_only">%1$d icons are already identical; nothing to update</string>
+    <string name="msg_import_edit_reset">%1$d of them had custom edits cleared because the artwork changed</string>
 
     <!-- ===== Icon editor (FR-05) ===== -->
     <string name="editor_title">Edit icon</string>

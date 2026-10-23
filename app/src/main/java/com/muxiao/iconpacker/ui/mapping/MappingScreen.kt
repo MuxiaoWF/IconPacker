@@ -90,6 +90,7 @@ import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.data.AppInfoProvider
 import com.muxiao.iconpacker.data.IconAssetEntity
 import com.muxiao.iconpacker.domain.ImportBinder
+import com.muxiao.iconpacker.domain.MappingConflict
 import com.muxiao.iconpacker.domain.MappingTarget
 import com.muxiao.iconpacker.ui.IconImage
 import com.muxiao.iconpacker.ui.components.AppDivider
@@ -488,6 +489,8 @@ fun MappingScreen(
         MappingTargetDialog(
             draft = draft,
             apps = state.apps,
+            slotByComponent = state.slotByComponent,
+            iconNameBySlot = state.iconNameBySlot,
             onConfirm = { component ->
                 val slot = draft.iconSlot
                 if (slot != null) {
@@ -878,6 +881,8 @@ private fun SearchField(
 private fun MappingTargetDialog(
     draft: TargetDraft,
     apps: List<AppRow>,
+    slotByComponent: Map<String, Int>,
+    iconNameBySlot: Map<Int, String>,
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -935,6 +940,28 @@ private fun MappingTargetDialog(
                                 text = stringResource(R.string.mapping_target_not_installed),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        // 该包名已经被另一张图标占用：写下去就等于把那张顶掉。
+                        // 必须在**确认之前**说清楚被顶掉的是哪张——只说"会替换"仍然等于没说，
+                        // 用户回头看到池子里多出一张"未映射"的图，会以为是导入出了问题。
+                        val conflict = MappingConflict.find(
+                            component = resolution.component,
+                            slotByComponent = slotByComponent,
+                            iconNameBySlot = iconNameBySlot,
+                            assigningSlot = draft.iconSlot,
+                            editingComponent = draft.from?.component,
+                        )
+                        if (conflict != null) {
+                            val occupant = conflict.iconName
+                            Text(
+                                text = if (occupant != null) {
+                                    stringResource(R.string.mapping_conflict_warn, occupant)
+                                } else {
+                                    stringResource(R.string.mapping_conflict_warn_generic)
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
                             )
                         }
                         val from = draft.from

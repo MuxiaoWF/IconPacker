@@ -66,6 +66,15 @@ data class MappingUiState(
      * 而不是给图标再发明一个"只看未使用"，否则同一屏里会出现两个语义相近的开关。
      */
     val onlyUnmapped: Boolean = false,
+    /**
+     * 组件 → 槽位（**含目标未安装的预置映射**）。
+     *
+     * 包名编辑对话框用它判断"这个包名是不是已经有图标了"（见 [MappingConflict]）。
+     * 预置映射同样占着包名——应用没装不代表它不挡路，把它排除掉会漏报冲突。
+     */
+    val slotByComponent: Map<String, Int> = emptyMap(),
+    /** 槽位 → 图标显示名（冲突提示里要指名道姓："已被「com.tencent.mm」使用"） */
+    val iconNameBySlot: Map<Int, String> = emptyMap(),
     val loading: Boolean = true,
     val importing: Boolean = false,
     val message: List<UiText>? = null,
@@ -181,6 +190,8 @@ class MappingViewModel(
             apps = appRows,
             icons = icons,
             iconTargets = iconTargets,
+            slotByComponent = slotByComponent,
+            iconNameBySlot = icons.associate { it.slot to it.originalName },
             query = controls.query,
             onlyUnmapped = controls.onlyUnmapped,
             loading = apps.isEmpty(),
@@ -226,7 +237,14 @@ class MappingViewModel(
             if (fromComponent != null && fromComponent != component) {
                 val displaced = repository.remapComponent(packId, fromComponent, component, slot)
                 messageFlow.value = if (displaced != null) {
-                    listOf(UiText(R.string.msg_retarget_displaced, target))
+                    // 指名道姓：被顶掉的是哪张图（只说包名等于没说，用户根本不知道少了什么）
+                    listOf(
+                        UiText(
+                            R.string.msg_retarget_displaced,
+                            target,
+                            repository.iconNameAt(packId, displaced.slot),
+                        ),
+                    )
                 } else {
                     listOf(UiText(R.string.msg_retarget, target))
                 }
@@ -237,7 +255,13 @@ class MappingViewModel(
                 messageFlow.value = if (previousSlot == null || previousSlot == slot) {
                     null
                 } else {
-                    listOf(UiText(R.string.msg_reassign_icon, target))
+                    listOf(
+                        UiText(
+                            R.string.msg_reassign_icon,
+                            target,
+                            repository.iconNameAt(packId, previousSlot),
+                        ),
+                    )
                 }
             }
         }
@@ -296,9 +320,12 @@ class MappingViewModel(
      * 静默丢弃与静默不匹配，是这一块最容易积累困惑的地方。
      */
     private fun describeImport(outcome: ImportOutcome, fromZip: Boolean): List<UiText> {
-        if (outcome.imported == 0) {
+        if (!outcome.changed) {
+            // 一张都没进来，或全都与池中一模一样（重复导入同一份 ZIP 就落在这一支）
             return listOf(
                 when {
+                    outcome.unchanged > 0 ->
+                        UiText(R.string.msg_import_unchanged_only, outcome.unchanged)
                     outcome.truncated > 0 ->
                         UiText(R.string.msg_import_pool_full, PackRepository.MAX_SLOTS)
                     fromZip -> UiText(R.string.msg_zip_no_images)
@@ -306,12 +333,18 @@ class MappingViewModel(
                 },
             )
         }
-        val parts = ArrayList<UiText>(5)
-        parts += if (fromZip) {
-            UiText(R.string.msg_imported_from_zip, outcome.imported)
-        } else {
-            UiText(R.string.msg_imported, outcome.imported)
+        val parts = ArrayList<UiText>(7)
+        if (outcome.imported > 0) {
+            parts += if (fromZip) {
+                UiText(R.string.msg_imported_from_zip, outcome.imported)
+            } else {
+                UiText(R.string.msg_imported, outcome.imported)
+            }
         }
+        // 更新与未变化必须单独报：否则"60 张更新 + 60 张新增"会被读成"只进来了 60 张"
+        if (outcome.updated > 0) parts += UiText(R.string.msg_import_updated, outcome.updated)
+        if (outcome.unchanged > 0) parts += UiText(R.string.msg_import_unchanged, outcome.unchanged)
+        if (outcome.editedReset > 0) parts += UiText(R.string.msg_import_edit_reset, outcome.editedReset)
 
         if (outcome.autoMapped > 0) {
             val detail = buildList {
@@ -326,10 +359,13 @@ class MappingViewModel(
             if (outcome.presetMapped > 0) {
                 parts += UiText(R.string.msg_automap_preset, outcome.presetMapped)
             }
-        } else if (fromZip && outcome.manifestPath == null) {
-            parts += UiText(R.string.msg_zip_no_appfilter)
-        } else if (fromZip) {
-            parts += UiText(R.string.msg_zip_no_auto_match)
+        } else if (fromZip && outcome.imported > 0) {
+            // 纯更新时不该弹"没匹配到应用"——那些图标本来就已经有映射了
+            parts += if (outcome.manifestPath == null) {
+                UiText(R.string.msg_zip_no_appfilter)
+            } else {
+                UiText(R.string.msg_zip_no_auto_match)
+            }
         }
 
         if (outcome.duplicates > 0) parts += UiText(R.string.msg_import_merged, outcome.duplicates)

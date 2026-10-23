@@ -2,8 +2,11 @@ package com.muxiao.iconpacker.data
 
 import android.content.Context
 import android.net.Uri
+import com.muxiao.iconpacker.R
 import com.muxiao.iconpacker.core.packer.engine.ImportCompressor
 import com.muxiao.iconpacker.core.packer.engine.ZipIconPlanner
+import com.muxiao.iconpacker.core.packer.zip.ZipArchive
+import com.muxiao.iconpacker.core.packer.zip.ZipFormatException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -11,11 +14,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.InputStream
 import java.util.zip.CRC32
-import java.util.zip.ZipInputStream
 
 /**
  * 应用私有文件布局管理。
@@ -175,7 +175,7 @@ class IconFileStore(
         withContext(Dispatchers.IO) {
             val safeName = sanitizeName(displayName)
             val target = File(iconsDir(packId), "${slot}__${seq}__$safeName")
-            context.contentResolver.openInputStream(uri)?.use { input: InputStream ->
+            context.contentResolver.openInputStream(uri)?.use { input ->
                 target.outputStream().use { output -> input.copyTo(output) }
             } ?: error("无法读取所选文件：$uri")
             importCompressor.compressInPlace(target).absolutePath
@@ -192,11 +192,23 @@ class IconFileStore(
      * 3. **顺带收集 appfilter.xml**（二进制 AXML 或明文），它是包作者写下的权威映射表；
      * 4. **只压缩最终保留的文件**——去重掉的那批连编码都不必做。
      *
+     * 5. **落地名带批次令牌**：`zip__<批次>__<seq>__<名字>`。此前只有 `zip__<seq>__`，
+     *   而 `seq` 每次导入都从 0 重来——**同名条目在第二次导入时会覆盖上一批的文件**，
+     *   而上一批的数据库记录仍指向该路径，等于旧槽位的图被悄悄换掉。加上批次令牌后
+     *   每一批的落地路径互不重叠，"更新"由仓库层显式完成（见
+     *   [com.muxiao.iconpacker.domain.ImportMergePlanner]），而不是靠文件名撞车碰巧发生。
+     *
+     * 6. **自己不依赖 `java.util.zip` 解名字**：见 [ZipArchive]——中文 Windows 压出来的
+     *   包用 GBK 写条目名且不置 UTF-8 标志，Android 的 `ZipInputStream` 一律按 UTF-8 解，
+     *   会在第 2 个条目上直接抛 `MALFORMED[1]`。这里改由 [ZipArchive] 读中央目录并按
+     *   整包判定编码，这类包现在能正常导入。
+     *
      * 非图片条目只计数不落盘，调用方据此提示用户（FR-03 验收标准 1）。
      */
     suspend fun extractZipImages(packId: Long, zipFile: File): ZipExtraction =
         withContext(Dispatchers.IO) {
             val dest = iconsDir(packId)
+            val batch = System.currentTimeMillis()
             val staged = ArrayList<StagedEntry>()
             var skipped = 0
             var seq = 0
@@ -204,35 +216,47 @@ class IconFileStore(
             var appFilterPath: String? = null
             var appFilterRank = 0
 
-            ZipInputStream(zipFile.inputStream().buffered()).use { zis ->
-                var entry = zis.nextEntry
-                while (entry != null) {
+            ZipArchive.open(zipFile).use { archive ->
+                for (entry in archive.entries) {
                     val name = entry.name
                     val rank = appFilterRankOf(name)
                     when {
                         entry.isDirectory -> Unit
                         isImageName(name) -> {
-                            val target = File(dest, "zip__${seq}__${sanitizeName(name)}")
-                            target.outputStream().buffered(IO_BUFFER).use { out ->
-                                zis.copyTo(out, IO_BUFFER)
+                            // 中央目录自述的大小就超标 → 连盘都不用落（zip 炸弹的前置拦截）
+                            if (!entry.isReadable || entry.size > MAX_IMAGE_BYTES) {
+                                skipped++
+                                continue
                             }
                             seq++
-                            if (target.length() > MAX_IMAGE_BYTES) {
+                            val target = File(dest, "zip__${batch}__${seq}__${sanitizeName(name)}")
+                            val written = runCatching {
+                                archive.open(entry).use { input ->
+                                    target.outputStream().buffered(IO_BUFFER).use { out ->
+                                        input.copyTo(out, IO_BUFFER)
+                                    }
+                                }
+                            }.isSuccess
+                            // 落盘后再校一次：中央目录里的大小是自述的，真实字节仍可能超标
+                            if (!written || target.length() > MAX_IMAGE_BYTES) {
                                 target.delete()
                                 skipped++
                             } else {
                                 staged += StagedEntry(target, name)
                             }
                         }
-                        // 优先 res/xml/appfilter.xml；同等级只认第一个
+                        // 优先 res/xml/appfilter.xml；同等级只认第一个，读失败则让位给后面的候选
                         rank > appFilterRank -> {
-                            appFilterBytes = zis.readCapped()
-                            appFilterPath = name
-                            appFilterRank = rank
+                            val bytes = runCatching { archive.readBytes(entry, MAX_APP_FILTER_BYTES) }
+                                .getOrNull()
+                            if (bytes != null) {
+                                appFilterBytes = bytes
+                                appFilterPath = name
+                                appFilterRank = rank
+                            }
                         }
                         else -> skipped++
                     }
-                    entry = zis.nextEntry
                 }
             }
 
@@ -279,16 +303,28 @@ class IconFileStore(
             )
         }
 
-    /** 把用户通过文件分享/下载得到的 ZIP 先落地再解包 */
+    /**
+     * 把用户通过文件分享/下载得到的 ZIP 先落地再解包。
+     *
+     * 结构损坏的包在这里统一收敛成一句用户能看懂的话：底层 [ZipFormatException] 的
+     * message 是给排查用的（越界偏移、第几条目录损坏……），直接甩到界面上只会变成
+     * `MALFORMED[1]` 那类无从下手的报错。
+     */
     suspend fun importZipFromUri(packId: Long, uri: Uri): ZipExtraction =
         withContext(Dispatchers.IO) {
             val staged = File(iconsDir(packId), STAGED_ZIP_NAME)
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                staged.outputStream().buffered(IO_BUFFER).use { out ->
-                    input.copyTo(out, IO_BUFFER)
-                }
-            } ?: error("无法读取 ZIP：$uri")
-            extractZipImages(packId, staged).also { staged.delete() }
+            try {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    staged.outputStream().buffered(IO_BUFFER).use { out ->
+                        input.copyTo(out, IO_BUFFER)
+                    }
+                } ?: error("无法读取 ZIP：$uri")
+                extractZipImages(packId, staged)
+            } catch (e: ZipFormatException) {
+                throw LocalizedException(R.string.err_zip_malformed)
+            } finally {
+                staged.delete()
+            }
         }
 
     /**
@@ -320,6 +356,21 @@ class IconFileStore(
         var n: Int
         while (stream.read(buf).also { n = it } != -1) crc.update(buf, 0, n)
         crc.value
+    }
+
+    /**
+     * 两个文件是否**字节完全一致**（重复导入的"未变化"判定）。
+     *
+     * 先比长度再比 CRC32：长度不同直接短路（绝大多数"确实更新了"在这一步就命中），
+     * 长度相同才逐块读。不用 `readBytes().contentEquals(...)`——一次导入几百张时，
+     * 那等于把整个 ZIP 解出来的内容再完整装进内存两遍。
+     *
+     * 任一文件不存在一律判为"不一致"：缺失必须走更新，不能因为读不到就当作没变化。
+     */
+    suspend fun sameContent(a: File, b: File): Boolean = withContext(Dispatchers.IO) {
+        if (!a.isFile || !b.isFile) return@withContext false
+        if (a.length() != b.length()) return@withContext false
+        crc32Of(a) == crc32Of(b)
     }
 
     /** 保存编辑产物（FR-05：从原图合成的带样式 WebP，覆盖同槽位旧产物） */
@@ -440,20 +491,6 @@ class IconFileStore(
     }
 
     /** 读取至多 [MAX_APP_FILTER_BYTES] 字节：appfilter 是不可信输入，不能无上限地读进内存 */
-    private fun InputStream.readCapped(): ByteArray {
-        val limit = MAX_APP_FILTER_BYTES
-        val out = ByteArrayOutputStream()
-        val buffer = ByteArray(8192)
-        var total = 0
-        while (total < limit) {
-            val read = read(buffer, 0, minOf(buffer.size, limit - total))
-            if (read <= 0) break
-            out.write(buffer, 0, read)
-            total += read
-        }
-        return out.toByteArray()
-    }
-
     /** 已落地但尚未规划（去重）的候选条目 */
     private class StagedEntry(val file: File, val path: String)
 

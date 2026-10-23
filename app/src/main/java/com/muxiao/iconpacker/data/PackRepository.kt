@@ -19,6 +19,7 @@ import com.muxiao.iconpacker.core.packer.sign.SigningKeyProvider
 import com.muxiao.iconpacker.core.packer.sign.SigningSchemes
 import com.muxiao.iconpacker.domain.AppMatcher
 import com.muxiao.iconpacker.domain.ImportBinder
+import com.muxiao.iconpacker.domain.ImportMergePlanner
 import com.muxiao.iconpacker.domain.ImportOutcome
 import com.muxiao.iconpacker.domain.MappingReconciler
 import com.muxiao.iconpacker.domain.PackVersionRules
@@ -381,7 +382,12 @@ class PackRepository(
     }
 
     /**
-     * ZIP 批量导入：解包（去重、取 appfilter）→ 入池 → 自动建立映射。
+     * ZIP 批量导入：解包（去重、取 appfilter）→ 与既有图标池合并 → 自动建立映射。
+     *
+     * **重复导入是幂等的**（FR-03）：同一批图标第二次导入时，命中既有图标的条目走
+     * "更新"而不是"新增"——槽位不变、映射不变，只把原图换成新文件；字节完全一致的
+     * 连文件都不动。判定规则见 [ImportMergePlanner]（组件强判据 → 名称弱判据 → 新增）。
+     * 旧实现在这一层什么都不比对，60 张变 180 行、还靠同名文件互相覆盖，属于静默的数据损坏。
      *
      * 映射分两层自动完成（见 [ImportBinder]）：L1 用包内 appfilter 的权威映射，
      * L2 用"文件名/目录名 = 包名"的确定性匹配。两者都不涉及相似度猜测，
@@ -396,40 +402,147 @@ class PackRepository(
         val manifestEntries = extraction.appFilterBytes
             ?.let { bytes -> runCatching { IconPackManifest.parse(bytes).entries }.getOrDefault(emptyList()) }
             .orEmpty()
+        val items = extraction.items
 
-        val used = usedSlots(packId)
-        val accepted = extraction.items.take(availableSlots(used))
-        val truncated = extraction.items.size - accepted.size
-        // 超出槽位上限的条目立即删除，不在私有目录留孤儿
-        extraction.items.drop(accepted.size).forEach { fileStore.deleteFile(it.file.absolutePath) }
-
-        if (accepted.isEmpty()) {
+        if (items.isEmpty()) {
             return ImportOutcome(
                 skipped = extraction.skipped,
                 duplicates = extraction.duplicates,
                 manifestPath = extraction.appFilterPath,
-                truncated = truncated,
             )
         }
 
-        val slots = allocateSlots(used, accepted.size)
-        val sources = accepted.map {
-            ImportedSource(
-                path = it.file.absolutePath,
-                fileName = it.fileName,
-                matchKey = it.matchKey,
+        // 组件认领：这里**刻意不跳过已映射组件**——已映射的组件恰恰是判断"哪张图该更新
+        // 哪个槽位"的最强依据。真正的"不覆盖用户的人工指派"在下游写映射时把关。
+        val claims = ImportBinder.bind(
+            manifestEntries = manifestEntries,
+            icons = items.mapIndexed { index, item ->
+                ImportBinder.IconItem(index, item.fileName, item.matchKey)
+            },
+            apps = appInfoProvider.loadLaunchableApps().map {
+                ImportBinder.AppItem(it.component, it.packageName)
+            },
+        )
+        val componentsByIcon = HashMap<Int, MutableSet<String>>()
+        for (claim in claims) componentsByIcon.getOrPut(claim.iconIndex) { LinkedHashSet() } += claim.component
+
+        val existing = assetDao.getByPack(packId)
+        val mappings = mappingDao.getByPack(packId)
+        // 一个槽位可能服务多个组件（同一张图给多个应用用），故按槽位聚成集合
+        val componentsBySlot = HashMap<Int, MutableSet<String>>()
+        for (mapping in mappings) componentsBySlot.getOrPut(mapping.slot) { LinkedHashSet() } += mapping.component
+
+        val plan = ImportMergePlanner.plan(
+            existing = existing.map { asset ->
+                ImportMergePlanner.Existing(
+                    slot = asset.slot,
+                    originalName = asset.originalName,
+                    components = componentsBySlot[asset.slot].orEmpty(),
+                )
+            },
+            incoming = items.mapIndexed { index, item ->
+                ImportMergePlanner.Incoming(index, item.matchKey, componentsByIcon[index].orEmpty())
+            },
+        )
+
+        // 只有新增才消耗槽位：池满时更新照样生效，不该被"槽位上限"连坐
+        val used = existing.mapTo(sortedSetOf<Int>()) { it.slot }
+        val acceptedInserts = plan.inserts.take(availableSlots(used))
+        val truncated = plan.inserts.size - acceptedInserts.size
+        // 超出槽位上限的新增条目立即删除，不在私有目录留孤儿
+        plan.inserts.drop(acceptedInserts.size).forEach { index ->
+            fileStore.deleteFile(items[index].file.absolutePath)
+        }
+        val slotOfInsert = acceptedInserts.zip(allocateSlots(used, acceptedInserts.size)).toMap()
+
+        val assetBySlot = existing.associateBy { it.slot }
+        val replacedPaths = ArrayList<String>()
+        var updated = 0
+        var unchanged = 0
+        var editedReset = 0
+        for ((index, slot) in plan.updates) {
+            val item = items[index]
+            val old = assetBySlot[slot] ?: continue
+            // 同一张图重导：字节一致就彻底不动（不重写文件、不碰记录）——幂等的关键一步
+            if (fileStore.sameContent(File(old.sourcePath), item.file)) {
+                // 路径判等是必要的保险：万一两批拿到了同一个落地路径（同一毫秒内连续导入），
+                // 这里删掉的就是旧槽位正在用的那个文件
+                if (item.file.absolutePath != old.sourcePath) {
+                    fileStore.deleteFile(item.file.absolutePath)
+                }
+                unchanged++
+                continue
+            }
+            assetDao.replaceSource(packId, slot, item.file.absolutePath, item.matchKey)
+            replacedPaths += old.sourcePath
+            // 编辑产物是按旧原图合成的，原图已换就必须一并作废（否则更新看不到效果）
+            old.editedPath?.let { path ->
+                replacedPaths += path
+                editedReset++
+            }
+            updated++
+        }
+
+        val now = System.currentTimeMillis()
+        if (slotOfInsert.isNotEmpty()) {
+            assetDao.insertAll(
+                slotOfInsert.map { (index, slot) ->
+                    val item = items[index]
+                    IconAssetEntity(
+                        packId = packId,
+                        slot = slot,
+                        sourcePath = item.file.absolutePath,
+                        originalName = item.matchKey,
+                        addedAt = now,
+                    )
+                },
             )
         }
-        return insertAndBind(
-            packId = packId,
-            slots = slots,
-            sources = sources,
+
+        // 已存在的映射一律让位：自动绑定绝不覆盖用户的人工指派。
+        // 更新走的是同一槽位，因此"不覆盖映射"与"图标换新"并不冲突。
+        val mappedComponents = mappings.mapTo(HashSet()) { it.component }
+        val newBindings = claims.filter { it.component !in mappedComponents }
+        newBindings.forEach { binding ->
+            val slot = plan.updates[binding.iconIndex] ?: slotOfInsert[binding.iconIndex] ?: return@forEach
+            mappingDao.upsert(MappingEntity(packId = packId, component = binding.component, slot = slot))
+        }
+
+        // 被替换下来的原图 / 编辑产物：等数据库写完再删，且确认再无记录引用
+        deleteUnreferencedFiles(packId, replacedPaths)
+
+        touchPack(packId)
+        return ImportOutcome(
+            imported = slotOfInsert.size,
+            updated = updated,
+            unchanged = unchanged,
+            editedReset = editedReset,
+            manifestMapped = newBindings.count { it.source == ImportBinder.Source.MANIFEST },
+            // 预置映射只可能来自 L1（L2 需要设备上的真实启动组件，未安装时无从得知）
+            presetMapped = newBindings.count { !it.installed },
+            packageMapped = newBindings.count { it.source == ImportBinder.Source.PACKAGE_NAME },
             skipped = extraction.skipped,
             duplicates = extraction.duplicates,
-            manifestEntries = manifestEntries,
             manifestPath = extraction.appFilterPath,
             truncated = truncated,
         )
+    }
+
+    /**
+     * 删除刚被替换下来的文件——前提是数据库里已经没有记录引用它。
+     *
+     * 不能无条件删：历史版本遗留的重复记录（同一路径被两个槽位引用）正是在这次
+     * 更新里被识别出来的，删早了会让另一个槽位变成断链（图标显示空白）。
+     */
+    private suspend fun deleteUnreferencedFiles(packId: Long, candidates: Collection<String>) {
+        if (candidates.isEmpty()) return
+        val referenced = HashSet<String>()
+        assetDao.getByPack(packId).forEach { asset ->
+            referenced.add(asset.sourcePath)
+            asset.editedPath?.let { referenced.add(it) }
+        }
+        packDao.getById(packId)?.iconPath?.let { referenced.add(it) }
+        candidates.filterNot { it in referenced }.forEach { fileStore.deleteFile(it) }
     }
 
     /**
@@ -474,6 +587,15 @@ class PackRepository(
     }
 
     /**
+     * 槽位的显示名，用于"被替换的是哪张图"这类回执。
+     *
+     * 图标记录缺失时回退到包内资源名 `ic_%04d`——那正是产物里这张图标的名字，
+     * 比返回 null 让上层再临时编一句兜底文案更诚实。
+     */
+    suspend fun iconNameAt(packId: Long, slot: Int): String =
+        assetDao.get(packId, slot)?.originalName ?: "ic_%04d".format(slot)
+
+    /**
      * 改写既有映射的目标组件（FR-04「编辑映射包名」），槽位不变。
      *
      * 为什么不落成"先删后增"：两步之间会短暂丢失映射，且若新目标已存在，
@@ -483,13 +605,13 @@ class PackRepository(
      * 别名 Activity 与主 Activity 都写了进来）——此时后者被顶掉，返回值把它报出去，
      * 让用户知道"少了一条"是这次改写的结果，而不是自己看花了眼。
      *
-     * @return 被顶掉的既有映射的组件名；null 表示没有冲突
+     * @return 被顶掉的既有映射（组件 + 它当时用的槽位，调用方据此报出"被替换的是哪张图"）；
+     *   null 表示没有冲突
      */
-    suspend fun remapComponent(packId: Long, from: String, to: String, slot: Int): String? {
+    suspend fun remapComponent(packId: Long, from: String, to: String, slot: Int): MappingEntity? {
         if (from == to) return null
         val displaced = mappingDao.getByPack(packId)
             .firstOrNull { it.component == to }
-            ?.component
         mappingDao.upsert(MappingEntity(packId = packId, component = to, slot = slot))
         mappingDao.delete(packId, from)
         touchPack(packId)
@@ -810,7 +932,10 @@ class PackRepository(
     private data class ImportedSource(val path: String, val fileName: String, val matchKey: String)
 
     /**
-     * 入池并自动绑定映射（两个导入通道的公共尾部）。
+     * 入池并自动绑定映射（**照片选择器通道**的尾部）。
+     *
+     * ZIP 通道不走这里：它要先与既有图标池合并（更新/跳过/新增），见 [importFromZip]。
+     * 相册导入的每一张都是用户主动挑的独立素材，没有"同一身份"可比，故保持只增不改。
      *
      * `originalName` 落的是 [ImportedSource.matchKey] 而不是原始文件名——它是"当前可得的最佳匹配键"：
      * 文件名叫包名时就是包名，目录是包名时就是目录名，都不成立才退回文件名。

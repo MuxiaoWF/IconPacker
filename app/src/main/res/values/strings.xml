@@ -290,6 +290,7 @@
     <string name="err_icon_missing">图标不存在：pack=%1$s slot=%2$d</string>
     <string name="err_no_artifact">没有可导出的产物，请先打包</string>
     <string name="err_icons_pool_full">图标池已满（上限 %1$d 个）</string>
+    <string name="err_zip_malformed">无法读取这个 ZIP：文件可能已损坏，或使用了不支持的压缩方式</string>
 
     <!-- ===== 映射工作台（FR-03/FR-04） ===== -->
     <string name="mapping_title_fallback">映射工作台</string>
@@ -320,6 +321,8 @@
     <string name="mapping_resolve_target">将映射到 %1$s</string>
     <string name="mapping_target_not_installed">该应用尚未安装：映射会先写进产物，装上后自动校准启动入口。</string>
     <string name="mapping_retarget_warn">保存后这条映射改指向 %1$s，%2$s 不再有映射。</string>
+    <string name="mapping_conflict_warn">该包名已被「%1$s」使用，继续将替换它（该图标变为未映射）</string>
+    <string name="mapping_conflict_warn_generic">该包名已被另一张图标使用，继续将替换它（该图标变为未映射）</string>
     <string name="mapping_next_step">下一步</string>
     <string name="mapping_pick_app">选择应用</string>
     <string name="common_search">搜索</string>
@@ -356,9 +359,9 @@
     <string name="mapping_msg_separator">；</string>
     <string name="mapping_automap_sep">、</string>
     <string name="msg_preset_activated">已为 %1$d 个新安装的应用启用预置图标</string>
-    <string name="msg_retarget_displaced">映射已改指向 %1$s（该目标原有的映射被替换）</string>
+    <string name="msg_retarget_displaced">映射已改指向 %1$s（该目标原来用的「%2$s」已取消映射）</string>
     <string name="msg_retarget">映射已改指向 %1$s</string>
-    <string name="msg_reassign_icon">已将 %1$s 的映射改到这张图标上（它原有的映射已被替换）</string>
+    <string name="msg_reassign_icon">已将 %1$s 的映射改到这张图标上（原来用的「%2$s」已取消映射）</string>
     <string name="msg_unassign">已清除 %1$s 的图标映射</string>
     <string name="msg_automatch_added">自动匹配新增 %1$d 个映射</string>
     <string name="msg_automatch_none">没有找到可自动匹配的应用</string>
@@ -383,6 +386,10 @@
     <string name="msg_import_merged">合并 %1$d 个多密度副本</string>
     <string name="msg_import_skipped">跳过 %1$d 个非图片文件</string>
     <string name="msg_import_truncated">另有 %1$d 个超出槽位上限未导入</string>
+    <string name="msg_import_updated">更新 %1$d 个已有图标</string>
+    <string name="msg_import_unchanged">%1$d 个图标与池中一致，未重复添加</string>
+    <string name="msg_import_unchanged_only">%1$d 个图标与池中完全一致，无需更新</string>
+    <string name="msg_import_edit_reset">其中 %1$d 个已清空自定义编辑（原图已更新）</string>
 
     <!-- ===== 图标编辑页（FR-05） ===== -->
     <string name="editor_title">编辑图标</string>
