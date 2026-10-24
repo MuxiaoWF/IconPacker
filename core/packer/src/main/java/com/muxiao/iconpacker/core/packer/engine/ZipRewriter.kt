@@ -73,7 +73,14 @@ class ZipRewriter(private val source: ByteArray) {
                 var srcEntry = zis.nextEntry
                 while (srcEntry != null) {
                     val name = srcEntry.name
-                    val dropped = dropPrefixes.any { name.startsWith(it) }
+                    // zipflinger（AGP 的打包器）会在本地流里塞"空名条目"做对齐填充：
+                    // 只有本地头（extra 字段即填充字节），中央目录里**没有**登记。
+                    // 照抄会让 ZipOutputStream 给它补登记一条空名 CDE，而 Android
+                    // 运行时的 java.util.zip.ZipFile 对空名条目直接 NPE——产物体检
+                    // 五项全红（"attempt to get length of null array"）的根因。
+                    // 引擎读侧 ZipArchive 同样把空名条目当非条目跳过，两端口径一致。
+                    // 是否需要填充对齐由本写入器自行重建（STORED 条目的 alignmentExtra）。
+                    val dropped = name.isEmpty() || dropPrefixes.any { name.startsWith(it) }
                     if (!dropped) {
                         val replacement = pending.remove(name)
                         val preserve = name in keepSourceMethod

@@ -6,12 +6,18 @@
   由打包引擎用 AxmlPatcher 定点替换（见 core/packer/axml/AxmlPatcher.kt 的前置约束）。
 -->
 <resources>
-    <string name="ic_pack_label_prefix">包名</string>
-    <string name="ic_pack_stats">%1$d 个图标 · %2$d 个应用已映射</string>
     <string name="ic_pack_how_to_enable">启用图标包：启动器设置 → 图标样式 / 主题 → 选择本图标包</string>
+    <string name="ic_pack_dismiss">关闭</string>
     <string name="ic_pack_unmapped">未映射</string>
     <string name="ic_pack_not_installed">未安装</string>
     <string name="ic_pack_empty_title">这个图标包还没有内容</string>
     <string name="ic_pack_empty_hint">请回到 IconPacker 导入图标并完成映射后重新打包。</string>
     <string name="ic_pack_copied">已复制 %1$s</string>
+
+    <!-- 筛选条四档（"未安装/未映射"复用上面两词）；后三档筛空时的空态文案 -->
+    <string name="ic_pack_filter_all">全部</string>
+    <string name="ic_pack_filter_installed">已安装</string>
+    <string name="ic_pack_empty_installed">还没有映射到已安装的应用</string>
+    <string name="ic_pack_empty_not_installed">映射的目标应用都已安装</string>
+    <string name="ic_pack_empty_unmapped">所有图标都已映射到应用</string>
 </resources>
